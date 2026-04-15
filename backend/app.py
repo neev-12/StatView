@@ -1,3 +1,4 @@
+
 from flask import Flask,request, session, jsonify, render_template
 import os
 from analysis import basic_sales_analysis, sales_tab
