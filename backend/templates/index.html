@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}" class="active">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}">Data Upload</a>
+      <a href="{{ url_for('sales') }}">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="#">Decision Support</a>
+      <a href="#">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#about-section">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+<div class="db-page-header">
+    <div>
+      <h1 class="db-title">Dashboard Overview</h1>
+      <p class="db-subtitle">Your e-commerce analytics at a glance</p>
+    </div>
+  </div>
+
+  <section class="kpi-grid">
+
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <span class="kpi-label">Total Revenue</span>
+        <span class="kpi-icon"></span>
+      </div>
+      <div class="kpi-value" id="total-revenue">—</div>
+      <div class="kpi-helper">Across all products</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <span class="kpi-label">Total Profit</span>
+        <span class="kpi-icon"></span>
+      </div>
+      <div class="kpi-value" id="total-profit">—</div>
+      <div class="kpi-helper">Net earnings after cost</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <span class="kpi-label">Total Orders</span>
+        <span class="kpi-icon"></span>
+      </div>
+      <div class="kpi-value" id="total-orders">—</div>
+      <div class="kpi-helper">Unique sales transactions</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <span class="kpi-label">Avg Profit Margin</span>
+        <span class="kpi-icon"></span>
+      </div>
+      <div class="kpi-value" id="avg-margin">—</div>
+      <div class="kpi-helper">Average across all sales</div>
+    </div>
+  </section>
+
+<section class="db-main-grid">
+    <div class="panel db-chart-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Monthly Sales Trend</div>
+          <div class="panel-sub">Revenue aggregated by month</div>
+        </div>
+        <span class="panel-badge badge-teal">Revenue</span>
+      </div>
+      <canvas id="salesTrendChart" height="110"></canvas>
+    </div>
+    <div class="panel db-side-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Top Selling Products</div>
+          <div class="panel-sub">By total revenue</div>
+        </div>
+        <span class="panel-badge badge-green">Top 3</span>
+      </div>
+      <ul class="db-top-list" id="top-products"></ul>
+    </div>
+  </section>
+
+  <div class="qs-strip" id="qs-strip">
+  <div class="qs-item">
+    <span class="qs-label">Revenue per Order</span>
+    <span class="qs-value" id="qs-rev-per-order">—</span>
+  </div>
+  <div class="qs-divider"></div>
+  <div class="qs-item">
+    <span class="qs-label">Best Month</span>
+    <span class="qs-value" id="qs-best-month">—</span>
+  </div>
+  <div class="qs-divider"></div>
+  <div class="qs-item">
+    <span class="qs-label">Best Category</span>
+    <span class="qs-value" id="qs-best-category">—</span>
+  </div>
+  <div class="qs-divider"></div>
+  <div class="qs-item">
+    <span class="qs-label">Best Region</span>
+    <span class="qs-value" id="qs-best-region">—</span>
+  </div>
+  <div class="qs-divider"></div>
+  <div class="qs-item">
+    <span class="qs-label">Best Quarter</span>
+    <span class="qs-value" id="qs-best-quarter">—</span>
+  </div>
+</div>
+
+
+  <section class="db-main-grid" style="margin-top: 20px;">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Category Breakdown</div>
+        <div class="panel-sub">Revenue and margin per category</div>
+      </div>
+      <span class="panel-badge badge-teal">All Categories</span>
+    </div>
+    <table class="cat-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Revenue</th>
+          <th>Profit</th>
+          <th>Margin</th>
+        </tr>
+      </thead>
+      <tbody id="cat-table-body"></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Quarterly Performance</div>
+        <div class="panel-sub">Revenue per quarter with change</div>
+      </div>
+      <span class="panel-badge badge-indigo">Quarters</span>
+    </div>
+    <div class="qtr-list" id="qtr-list"></div>
+  </div>
+</section>
+
+<section id="about-section">
+    <h2 class="features-title">What you can do with StatView</h2>
+    <div class="features-grid">
+      <div class="feature-item">
+        <div class="feature-icon">📄</div>
+        <h3>Sales Analysis</h3>
+        <p>View e-commerce data analysed and simplied for you.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📊</div>
+        <h3>Sales Prediction</h3>
+        <p>View predicted sales over different quarters using past data.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">💡</div>
+        <h3>Decision Support</h3>
+        <p>Confused with Decisions, Allow built in support system help.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">☁️</div>
+        <h3>Connect to data</h3>
+        <p>Easily import your data from wherever it is—Excel workbooks, local databases, or the cloud.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📉</div>
+        <h3>Build a report</h3>
+        <p>Create and format visuals that present your data story in compelling and insightful ways.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📤</div>
+        <h3>What-if Analysis</h3>
+        <p>Alter Constraints as per need, and see how different scenarios work out.</p>
+        <div class="learn-more">Learn how</div>
+      </div>
+    </div>
+  </section>
+
+
+
+
+</main>
+<script>
+
+
+
+function loadDashboard() {
+
+    fetch("/summary")
+    .then(response => response.json())
+    .then(data => {
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        document.getElementById("total-revenue").innerText =
+            "$" + data.kpis.total_sales.toLocaleString();
+
+        document.getElementById("total-profit").innerText =
+            "$" + data.kpis.total_profit.toLocaleString();
+
+        document.getElementById("total-orders").innerText =
+            data.kpis.total_orders;
+
+        document.getElementById("avg-margin").innerText =
+            (data.kpis.average_profit_margin * 100).toFixed(2) + "%";
+
+        const revPerOrder = data.kpis.total_sales / data.kpis.total_orders;
+        document.getElementById("qs-rev-per-order").innerText =
+            "₹" + Math.round(revPerOrder).toLocaleString();
+
+const topList = document.getElementById("top-products");
+topList.innerHTML = "";
+
+data.top_products.forEach(product => {
+    const li = document.createElement("li");
+    li.innerHTML =
+        "<span>" + product.Product_Name + "</span>" +
+        "<span class='rev'>₹" + product.Revenue.toLocaleString() + "</span>";
+    topList.appendChild(li);
+});
+
+    })
+    .catch(error => {
+        console.error("Error loading dashboard:", error);
+    });
+}
+
+  function loadSalesAnalysis() {
+
+    fetch("/sales-analysis")
+    .then(response => response.json())
+    .then(data => {
+
+        const trendLabels = data.sales_trend.map(item => item.Month);
+        const trendRevenue = data.sales_trend.map(item => item.Revenue);
+
+        // Best month
+        const bestMonthIdx = trendRevenue.indexOf(Math.max(...trendRevenue));
+        document.getElementById("qs-best-month").innerText = trendLabels[bestMonthIdx];
+
+        // Best category
+        const bestCat = data.category_stats.reduce((a, b) => a.Revenue > b.Revenue ? a : b);
+        document.getElementById("qs-best-category").innerText = bestCat.Category;
+
+        // Best region
+        const bestReg = data.region_stats.reduce((a, b) => a.Revenue > b.Revenue ? a : b);
+        document.getElementById("qs-best-region").innerText = bestReg.Region;
+
+        // Best quarter
+        const bestQtr = data.quarterly_sales.reduce((a, b) => a.Revenue > b.Revenue ? a : b);
+        document.getElementById("qs-best-quarter").innerText = bestQtr.Quarter;
+
+        // Category breakdown table
+        const tbody = document.getElementById("cat-table-body");
+        tbody.innerHTML = "";
+        data.category_stats.forEach(cat => {
+            const margin = data.profit_margin_category.find(m => m.Category === cat.Category);
+            const marginVal = margin ? margin.Profit_Margin.toFixed(1) + "%" : "—";
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+                "<td>" + cat.Category + "</td>" +
+                "<td>₹" + cat.Revenue.toLocaleString() + "</td>" +
+                "<td>₹" + cat.Profit.toLocaleString() + "</td>" +
+                "<td><span class='margin-pill'>" + marginVal + "</span></td>";
+            tbody.appendChild(tr);
+        });
+
+        // Quarterly list
+        const qtrList = document.getElementById("qtr-list");
+        qtrList.innerHTML = "";
+        const qtrs = data.quarterly_sales;
+        qtrs.forEach((q, i) => {
+            const prev = qtrs[i - 1];
+            let changeHtml = "";
+            if (prev) {
+                const pct = ((q.Revenue - prev.Revenue) / prev.Revenue * 100).toFixed(1);
+                const up = pct >= 0;
+                changeHtml = "<span class='qtr-change " + (up ? "qtr-up" : "qtr-down") + "'>" +
+                    (up ? "▲" : "▼") + " " + Math.abs(pct) + "%</span>";
+            }
+            qtrList.innerHTML +=
+                "<div class='qtr-row'>" +
+                  "<div class='qtr-label'>" + q.Quarter + "</div>" +
+                  "<div class='qtr-bar-wrap'><div class='qtr-bar' style='width:" +
+                    Math.round(q.Revenue / Math.max(...qtrs.map(x => x.Revenue)) * 100) +
+                  "%'></div></div>" +
+                  "<div class='qtr-rev'>₹" + q.Revenue.toLocaleString() + "</div>" +
+                  changeHtml +
+                "</div>";
+        });
+
+        const trend = document.getElementById("salesTrendChart").getContext("2d");
+
+new Chart(trend, {
+    type: "line",
+    data: {
+        labels: trendLabels,
+        datasets: [{
+            label: "Revenue",
+            data: trendRevenue,
+            borderColor: '#0ea5a4',
+            backgroundColor: 'rgba(14,165,164,0.08)',
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: '#0ea5a4',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 12 } } },
+            y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#9ca3af', font: { size: 12 } } }
+        }
+    }
+});
+    })
+    .catch(error => {
+        console.error("Error loading sales analysis:", error);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    loadDashboard();
+    loadSalesAnalysis();
+});
+</script>
+</body>
+</html>

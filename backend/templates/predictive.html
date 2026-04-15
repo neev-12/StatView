@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView — Predictive</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}">Data Upload</a>
+      <a href="{{ url_for('sales') }}">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}" class="active">Predictive</a>
+      <a href="#">Decision Support</a>
+      <a href="#">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="sa-page-header">
+    <div>
+      <h1 class="sa-title">Predictive Analytics</h1>
+      <p class="sa-subtitle">Linear regression forecasts based on your historical sales data.</p>
+    </div>
+    <span class="panel-badge badge-indigo" style="font-size:12px; padding: 6px 14px;">Linear Regression Model</span>
+  </div>
+
+  <!-- Forecast KPI strip -->
+  <div class="qs-strip" id="forecast-strip">
+    <div class="qs-item">
+      <span class="qs-label">Next Month Forecast</span>
+      <span class="qs-value" id="fc-next-month">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">6-Month Total Forecast</span>
+      <span class="qs-value" id="fc-6m-total">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">Peak Month</span>
+      <span class="qs-value" id="fc-peak-month">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">Off-Season Month</span>
+      <span class="qs-value" id="fc-off-month">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">Fastest Growing Category</span>
+      <span class="qs-value" id="fc-top-cat">—</span>
+    </div>
+  </div>
+
+  <!-- Main forecast chart -->
+  <section class="sa-grid sa-grid-full">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Revenue Forecast — Next 6 Months</div>
+          <div class="panel-sub">Actual historical revenue vs predicted future revenue</div>
+        </div>
+        <span class="panel-badge badge-indigo">Forecast</span>
+      </div>
+      <canvas id="forecastChart" height="70"></canvas>
+    </div>
+  </section>
+
+  <!-- Category vs Overall Trend + Season heatmap -->
+  <section class="sa-grid sa-grid-50-50">
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Category vs Overall Trend</div>
+          <div class="panel-sub">Historical & 6-month forecast per category vs overall trend</div>
+        </div>
+        <span class="panel-badge badge-teal">Forecast</span>
+      </div>
+      <!-- Checkboxes -->
+      <div id="category-filter" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;"></div>
+      <!-- Chart -->
+      <canvas id="forecastCategoryChart" height="120"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Peak & Off-Season Detection</div>
+          <div class="panel-sub">Average revenue vs overall mean by month</div>
+        </div>
+        <span class="panel-badge badge-amber">Seasonality</span>
+      </div>
+      <div class="season-grid" id="season-grid"></div>
+    </div>
+
+  </section>
+
+</main>
+
+<script>
+
+const CAT_COLORS = [
+  "#6366f1","#f59e0b","#10b981","#ef4444",
+  "#3b82f6","#ec4899","#8b5cf6","#14b8a6"
+];
+
+let forecastCategoryChart = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function buildDataset(label, values, color, dashed) {
+  return {
+    label: label,
+    data: values,
+    borderColor: color,
+    backgroundColor: "transparent",
+    borderWidth: dashed ? 1.8 : 2.5,
+    borderDash: dashed ? [6, 4] : [],
+    pointRadius: 2,
+    tension: 0.3,
+    spanGaps: true
+  };
+}
+
+// Splits a full series into solid (historical) + dashed (forecast) datasets.
+// Overlaps by 1 point at the boundary so the lines connect visually.
+function splitSeries(label, allValues, color, histLen) {
+  const hist = allValues.map((v, i) => i < histLen ? v : null);
+  const fore = allValues.map((v, i) => i >= histLen - 1 ? v : null);
+  return [
+    buildDataset(label, hist, color, false),
+    buildDataset("",    fore, color, true)   // empty label → hidden from legend
+  ];
+}
+
+// ── Main loader ────────────────────────────────────────────────────────────
+
+function loadForecast() {
+  fetch("/forecast")
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { console.warn(data.error); return; }
+
+      const histLen   = data.historical_len;
+      const allLabels = data.all_labels;
+      const overall   = data.overall;
+
+      // ── KPI strip ────────────────────────────────────────────────────
+      const fcVals = overall.slice(histLen);
+
+      document.getElementById("fc-next-month").innerText =
+        "₹" + Math.round(fcVals[0]).toLocaleString();
+
+      const total6m = fcVals.reduce((a, b) => a + b, 0);
+      document.getElementById("fc-6m-total").innerText =
+        "₹" + Math.round(total6m).toLocaleString();
+
+      const peak    = data.season_data.reduce((a, b) => a.Avg_Revenue > b.Avg_Revenue ? a : b);
+      const offSeas = data.season_data.reduce((a, b) => a.Avg_Revenue < b.Avg_Revenue ? a : b);
+      document.getElementById("fc-peak-month").innerText = peak.Month_Name;
+      document.getElementById("fc-off-month").innerText  = offSeas.Month_Name;
+
+      // Fastest growing category — biggest rise across 6-month forecast
+      const cats = Object.keys(data.category_series);
+      let topCat = "", topGrowth = -Infinity;
+      cats.forEach(cat => {
+        const fore = data.category_series[cat].forecast;
+        if (fore.length < 2) return;
+        const growth = fore[fore.length - 1] - fore[0];
+        if (growth > topGrowth) { topGrowth = growth; topCat = cat; }
+      });
+      document.getElementById("fc-top-cat").innerText = topCat || "—";
+
+      // ── Overall forecast chart ────────────────────────────────────────
+      const histPadded = overall.map((v, i) => i < histLen ? v : null);
+      const forePadded = overall.map((v, i) => i >= histLen - 1 ? v : null);
+
+      new Chart(document.getElementById("forecastChart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: allLabels,
+          datasets: [
+            {
+              label: "Actual Revenue",
+              data: histPadded,
+              borderColor: "#0ea5a4",
+              backgroundColor: "rgba(14,165,164,0.08)",
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: "#0ea5a4",
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: "Forecast",
+              data: forePadded,
+              borderColor: "#6366f1",
+              backgroundColor: "rgba(99,102,241,0.08)",
+              borderWidth: 2.5,
+              borderDash: [6, 4],
+              pointRadius: 4,
+              pointBackgroundColor: "#6366f1",
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "top", labels: { color: "#374151", font: { size: 12 }, boxWidth: 10 } },
+            tooltip: {
+              backgroundColor: "rgba(17,24,39,0.88)",
+              titleColor: "#f9fafb",
+              bodyColor: "#d1d5db",
+              padding: 10,
+              cornerRadius: 8
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 12 } } },
+            y: {
+              grid: { color: "rgba(0,0,0,0.05)" },
+              ticks: { color: "#9ca3af", font: { size: 12 }, callback: v => "₹" + v.toLocaleString() }
+            }
+          }
+        }
+      });
+
+      // ── Category vs Overall chart ─────────────────────────────────────
+      renderCategoryForecast(data);
+
+      // ── Seasonality grid ──────────────────────────────────────────────
+      const grid = document.getElementById("season-grid");
+      grid.innerHTML = "";
+      data.season_data.forEach(s => {
+        const up        = s.Pct_vs_Avg >= 0;
+        const abs       = Math.abs(s.Pct_vs_Avg);
+        const intensity = Math.min(abs / 50, 1);
+        const bg        = up
+          ? `rgba(14,165,164,${0.1 + intensity * 0.35})`
+          : `rgba(239,68,68,${0.1 + intensity * 0.35})`;
+        grid.innerHTML +=
+          "<div class='season-cell' style='background:" + bg + "'>" +
+            "<div class='season-month'>" + s.Month_Name + "</div>" +
+            "<div class='season-pct " + (up ? "trend-up" : "trend-down") + "'>" +
+              (up ? "▲" : "▼") + " " + abs + "%" +
+            "</div>" +
+          "</div>";
+      });
+
+    })
+    .catch(err => console.error("Forecast error:", err));
+}
+
+// ── Category chart ─────────────────────────────────────────────────────────
+
+function renderCategoryForecast(data) {
+  const { all_labels, overall, historical_len, category_series } = data;
+  const categories = Object.keys(category_series);
+
+  // Build checkboxes
+  const filterDiv = document.getElementById("category-filter");
+  filterDiv.innerHTML = "";
+
+  // Overall checkbox
+  filterDiv.innerHTML += `
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151;">
+      <input type="checkbox" id="chk-overall" checked onchange="updateCategoryChart()" />
+      <span style="display:inline-block;width:24px;height:3px;background:#94a3b8;border-radius:2px;"></span>
+      Overall
+    </label>`;
+
+  // Per-category checkboxes
+  categories.forEach((cat, i) => {
+    const color = CAT_COLORS[i % CAT_COLORS.length];
+    filterDiv.innerHTML += `
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151;">
+        <input type="checkbox" id="chk-${CSS.escape(cat)}" checked onchange="updateCategoryChart()" />
+        <span style="display:inline-block;width:24px;height:3px;background:${color};border-radius:2px;"></span>
+        ${cat}
+      </label>`;
+  });
+
+  // Build and store datasets keyed by category
+  window._categoryDatasets = [];
+
+  // Overall
+  window._categoryDatasets.push({
+    key: "overall",
+    datasets: splitSeries("Overall", overall, "#94a3b8", historical_len)
+  });
+
+  // Per category
+  categories.forEach((cat, i) => {
+    const color     = CAT_COLORS[i % CAT_COLORS.length];
+    const allValues = category_series[cat].all_values;
+    window._categoryDatasets.push({
+      key: cat,
+      datasets: splitSeries(cat, allValues, color, historical_len)
+    });
+  });
+
+  // Initial draw
+  drawCategoryChart(all_labels);
+}
+
+function updateCategoryChart() {
+  const visible  = window._categoryDatasets.filter(entry => {
+    const chk = document.getElementById("chk-" + CSS.escape(entry.key));
+    return chk && chk.checked;
+  });
+  const datasets = visible.flatMap(e => e.datasets);
+
+  if (forecastCategoryChart) {
+    forecastCategoryChart.data.datasets = datasets;
+    forecastCategoryChart.update();
+  }
+}
+
+function drawCategoryChart(labels) {
+  const ctx = document.getElementById("forecastCategoryChart").getContext("2d");
+
+  if (forecastCategoryChart) {
+    forecastCategoryChart.destroy();
+  }
+
+  const datasets = window._categoryDatasets.flatMap(e => e.datasets);
+
+  forecastCategoryChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: "#374151",
+            font: { size: 12 },
+            boxWidth: 10,
+            // hide the duplicate dashed-line legend entries (label === "")
+            filter: item => item.text !== ""
+          }
+        },
+        tooltip: {
+          backgroundColor: "rgba(17,24,39,0.88)",
+          titleColor: "#f9fafb",
+          bodyColor: "#d1d5db",
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            label: ctx => {
+              if (ctx.raw === null || ctx.raw === undefined) return null;
+              if (ctx.dataset.label === "") return null;
+              return ctx.dataset.label + ": ₹" + Math.round(ctx.raw).toLocaleString();
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: "#9ca3af", font: { size: 11 }, maxRotation: 45 }
+        },
+        y: {
+          grid: { color: "rgba(0,0,0,0.05)" },
+          ticks: {
+            color: "#9ca3af",
+            font: { size: 12 },
+            callback: v => "₹" + v.toLocaleString()
+          }
+        }
+      }
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", loadForecast);
+</script>
+</body>
+</html>

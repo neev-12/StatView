@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView — Sales Analysis</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}">Data Upload</a>
+      <a href="{{ url_for('sales') }}" class="active">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="#">Decision Support</a>
+      <a href="#">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#about-section">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Page Header -->
+  <div class="sa-page-header">
+    <div>
+      <h1 class="sa-title">Sales Analysis</h1>
+      <p class="sa-subtitle">Explore trends, performance, and growth across your sales data.</p>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">&#8635; Reset Filters</button>
+  </div>
+
+  <!-- Filter Bar -->
+  <section class="filter-bar">
+    <div class="filter-group">
+      <label class="filter-label">Category</label>
+      <select class="filter-select" id="filterCategory">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Location</label>
+      <select class="filter-select" id="filterRegion">
+        <option value="">All Locations</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Date From</label>
+      <input type="date" class="filter-input" id="filterDateFrom">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Date To</label>
+      <input type="date" class="filter-input" id="filterDateTo">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Cost Price Range</label>
+      <div class="range-row">
+        <input type="number" class="filter-input range-input" id="filterCostMin" placeholder="Min">
+        <span class="range-sep">&#8211;</span>
+        <input type="number" class="filter-input range-input" id="filterCostMax" placeholder="Max">
+      </div>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Selling Price Range</label>
+      <div class="range-row">
+        <input type="number" class="filter-input range-input" id="filterSellMin" placeholder="Min">
+        <span class="range-sep">&#8211;</span>
+        <input type="number" class="filter-input range-input" id="filterSellMax" placeholder="Max">
+      </div>
+    </div>
+    <div class="filter-group filter-apply-group">
+      <button class="btn-apply" onclick="applyFilters()">Apply</button>
+    </div>
+  </section>
+
+  <!-- Row 1: Sales Trend (wide) + Quarterly Overview -->
+  <section class="sa-grid sa-grid-60-40">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Monthly Sales Trend</div>
+          <div class="panel-sub">Revenue aggregated by month</div>
+        </div>
+        <span class="panel-badge badge-teal">Revenue</span>
+      </div>
+      <canvas id="salesTrendChart" height="110"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Quarterly Overview</div>
+          <div class="panel-sub">Revenue per quarter</div>
+        </div>
+        <span class="panel-badge badge-indigo">Quarters</span>
+      </div>
+      <canvas id="quarterChart" height="110"></canvas>
+    </div>
+  </section>
+
+  <!-- Row 2: Category Pie + Region Bar -->
+  <section class="sa-grid sa-grid-40-60">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Category Breakdown</div>
+          <div class="panel-sub">Revenue share by category</div>
+        </div>
+        <span class="panel-badge badge-amber">Categories</span>
+      </div>
+      <div class="pie-wrap">
+        <canvas id="CategoryChart"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Sales by Location</div>
+          <div class="panel-sub">Revenue per region</div>
+        </div>
+        <span class="panel-badge badge-teal">Regions</span>
+      </div>
+      <canvas id="RegionChart" height="110"></canvas>
+    </div>
+  </section>
+
+  <!-- Row 3: Top Products -->
+  <section class="sa-grid sa-grid-50-50">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Top Products &#8212; Revenue</div>
+          <div class="panel-sub">Highest revenue generators</div>
+        </div>
+        <span class="panel-badge badge-green">Top 3</span>
+      </div>
+      <canvas id="topProductsChart" height="100"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Top Products &#8212; Profit</div>
+          <div class="panel-sub">Profit from top revenue products</div>
+        </div>
+        <span class="panel-badge badge-green">Top 3</span>
+      </div>
+      <canvas id="topProfit" height="100"></canvas>
+    </div>
+  </section>
+
+  <!-- Row 4: Low Products -->
+  <section class="sa-grid sa-grid-50-50">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Low Products &#8212; Revenue</div>
+          <div class="panel-sub">Lowest revenue performers</div>
+        </div>
+        <span class="panel-badge badge-red">Bottom 3</span>
+      </div>
+      <canvas id="lowProductsChart" height="100"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Low Products &#8212; Profit</div>
+          <div class="panel-sub">Profit from low revenue products</div>
+        </div>
+        <span class="panel-badge badge-red">Bottom 3</span>
+      </div>
+      <canvas id="lowProfit" height="100"></canvas>
+    </div>
+  </section>
+
+  <!-- Row 5: Profit Margin + Order Volume -->
+  <section class="sa-grid sa-grid-50-50">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Profit Margin by Category</div>
+          <div class="panel-sub">Margin percentage per category</div>
+        </div>
+        <span class="panel-badge badge-indigo">Margin %</span>
+      </div>
+      <canvas id="profitMarginChart" height="110"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Monthly Order Volume</div>
+          <div class="panel-sub">Number of orders per month</div>
+        </div>
+        <span class="panel-badge badge-indigo">Orders</span>
+      </div>
+      <canvas id="orderVolumeChart" height="110"></canvas>
+    </div>
+  </section>
+
+  <!-- Row 6: Category Growth (full width) -->
+  <section class="sa-grid sa-grid-full">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Category Growth Trend</div>
+          <div class="panel-sub">Monthly revenue trajectory per category</div>
+        </div>
+        <span class="panel-badge badge-amber">Growth</span>
+      </div>
+      <canvas id="categoryGrowthChart" height="70"></canvas>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ── Chart instance registry (destroy before redraw) ───────────────────────
+const chartInstances = {};
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+// ── Shared design tokens ──────────────────────────────────────────────────
+const PALETTE   = ["#0ea5a4","#6366f1","#f59e0b","#ef4444","#10b981","#8b5cf6","#ec4899","#14b8a6"];
+const baseFont  = { family: "'Segoe UI', sans-serif", size: 12 };
+const gridColor = "rgba(0,0,0,0.05)";
+const tickColor = "#9ca3af";
+
+function yAxis(prefix, suffix) {
+  return {
+    beginAtZero: true,
+    grid: { color: gridColor, drawBorder: false },
+    ticks: {
+      color: tickColor, font: baseFont,
+      callback: v => (prefix||"") + v.toLocaleString() + (suffix||"")
+    }
+  };
+}
+function xAxis() {
+  return {
+    grid: { display: false },
+    ticks: { color: tickColor, font: baseFont }
+  };
+}
+function yAxisHoriz(prefix, suffix) {
+  return {
+    grid: { display: false },
+    ticks: { color: tickColor, font: baseFont }
+  };
+}
+function xAxisHoriz(prefix) {
+  return {
+    grid: { color: gridColor, drawBorder: false },
+    ticks: {
+      color: tickColor, font: baseFont,
+      callback: v => (prefix||"") + v.toLocaleString()
+    }
+  };
+}
+const tooltipStyle = {
+  backgroundColor: "rgba(17,24,39,0.88)",
+  titleColor: "#f9fafb",
+  bodyColor: "#d1d5db",
+  padding: 10,
+  cornerRadius: 8
+};
+function legendStyle(pos) {
+  return { position: pos||"top", labels: { color: "#374151", font: baseFont, boxWidth: 10, padding: 16 } };
+}
+
+// ── Filter helpers ────────────────────────────────────────────────────────
+function buildQuery() {
+  const p = new URLSearchParams();
+  const v = id => document.getElementById(id).value;
+  if (v("filterCategory")) p.append("category",  v("filterCategory"));
+  if (v("filterRegion"))   p.append("region",    v("filterRegion"));
+  if (v("filterDateFrom")) p.append("date_from", v("filterDateFrom"));
+  if (v("filterDateTo"))   p.append("date_to",   v("filterDateTo"));
+  if (v("filterCostMin"))  p.append("cost_min",  v("filterCostMin"));
+  if (v("filterCostMax"))  p.append("cost_max",  v("filterCostMax"));
+  if (v("filterSellMin"))  p.append("sell_min",  v("filterSellMin"));
+  if (v("filterSellMax"))  p.append("sell_max",  v("filterSellMax"));
+  return p.toString() ? "?" + p.toString() : "";
+}
+
+function applyFilters() { loadSalesAnalysis(); }
+
+function resetFilters() {
+  ["filterCategory","filterRegion","filterDateFrom","filterDateTo",
+   "filterCostMin","filterCostMax","filterSellMin","filterSellMax"]
+    .forEach(id => document.getElementById(id).value = "");
+  loadSalesAnalysis();
+}
+
+// ── Populate filter dropdowns from dataset ───────────────────────────────
+function loadFilterOptions() {
+  fetch("/filter-options")
+    .then(r => r.json())
+    .then(opts => {
+      if (opts.error) return;
+      const catSel = document.getElementById("filterCategory");
+      opts.categories.forEach(c => {
+        const o = document.createElement("option"); o.value = c; o.textContent = c; catSel.appendChild(o);
+      });
+      const regSel = document.getElementById("filterRegion");
+      opts.regions.forEach(r => {
+        const o = document.createElement("option"); o.value = r; o.textContent = r; regSel.appendChild(o);
+      });
+      document.getElementById("filterDateFrom").value = opts.date_min;
+      document.getElementById("filterDateTo").value   = opts.date_max;
+      document.getElementById("filterCostMin").placeholder = opts.cost_min;
+      document.getElementById("filterCostMax").placeholder = opts.cost_max;
+      document.getElementById("filterSellMin").placeholder = opts.sell_min;
+      document.getElementById("filterSellMax").placeholder = opts.sell_max;
+    }).catch(() => {});
+}
+
+// ── Main chart renderer ───────────────────────────────────────────────────
+function loadSalesAnalysis() {
+  fetch("/sales-analysis" + buildQuery())
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { console.warn(data.error); return; }
+
+      // Sales Trend
+      destroyChart("salesTrendChart");
+      chartInstances["salesTrendChart"] = new Chart(
+        document.getElementById("salesTrendChart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: data.sales_trend.map(i => i.Month),
+          datasets: [{ label: "Revenue", data: data.sales_trend.map(i => i.Revenue),
+            borderColor: "#0ea5a4", backgroundColor: "rgba(14,165,164,0.10)",
+            borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: "#0ea5a4",
+            fill: true, tension: 0.4 }]
+        },
+        options: { responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxis(), y: yAxis("₹") } }
+      });
+
+      // Quarterly
+      destroyChart("quarterChart");
+      chartInstances["quarterChart"] = new Chart(
+        document.getElementById("quarterChart").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: data.quarterly_sales.map(i => i.Quarter),
+          datasets: [{ label: "Revenue", data: data.quarterly_sales.map(i => i.Revenue),
+            backgroundColor: data.quarterly_sales.map((_,i) => PALETTE[i % PALETTE.length]),
+            borderRadius: 2, borderSkipped: false }]
+        },
+        options: { responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxis(), y: yAxis("₹") } }
+      });
+
+      // Category Doughnut
+      destroyChart("CategoryChart");
+      chartInstances["CategoryChart"] = new Chart(
+        document.getElementById("CategoryChart").getContext("2d"), {
+        type: "doughnut",
+        data: {
+          labels: data.category_stats.map(i => i.Category),
+          datasets: [{ data: data.category_stats.map(i => i.Revenue),
+            backgroundColor: PALETTE, borderWidth: 2, borderColor: "#fff", hoverOffset: 8 }]
+        },
+        options: { responsive: true, cutout: "60%",
+          plugins: { legend: legendStyle("right"),
+            tooltip: { ...tooltipStyle, callbacks: {
+              label: ctx => " " + ctx.label + ": ₹" + ctx.parsed.toLocaleString() }} } }
+      });
+
+      // Region
+      destroyChart("RegionChart");
+      chartInstances["RegionChart"] = new Chart(
+        document.getElementById("RegionChart").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: data.region_stats.map(i => i.Region),
+          datasets: [{ label: "Revenue", data: data.region_stats.map(i => i.Revenue),
+            backgroundColor: PALETTE, borderRadius: 2, borderSkipped: false }]
+        },
+        options: { indexAxis: "y", responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxisHoriz("₹"), y: yAxisHoriz() } }
+      });
+
+      // Top Products — Revenue
+      destroyChart("topProductsChart");
+      const topLabels = data.top_products.map(i => i.Product_Name);
+      chartInstances["topProductsChart"] = new Chart(
+        document.getElementById("topProductsChart").getContext("2d"), {
+        type: "bar",
+        data: { labels: topLabels,
+          datasets: [{ label: "Revenue", data: data.top_products.map(i => i.Revenue),
+            backgroundColor: ["#10b981","#34d399","#6ee7b7"], borderRadius: 2, borderSkipped: false }]
+        },
+        options: { indexAxis: "y", responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxisHoriz("₹"), y: yAxisHoriz() } }
+      });
+
+      // Top Products — Profit
+      destroyChart("topProfit");
+      chartInstances["topProfit"] = new Chart(
+        document.getElementById("topProfit").getContext("2d"), {
+        type: "bar",
+        data: { labels: topLabels,
+          datasets: [{ label: "Profit", data: data.top_products.map(i => i.Profit),
+            backgroundColor: ["#10b981","#34d399","#6ee7b7"], borderRadius: 2, borderSkipped: false }]
+        },
+        options: { indexAxis: "y", responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxisHoriz("₹"), y: yAxisHoriz() } }
+      });
+
+      // Low Products — Revenue
+      destroyChart("lowProductsChart");
+      const lowLabels = data.low_products.map(i => i.Product_Name);
+      chartInstances["lowProductsChart"] = new Chart(
+        document.getElementById("lowProductsChart").getContext("2d"), {
+        type: "bar",
+        data: { labels: lowLabels,
+          datasets: [{ label: "Revenue", data: data.low_products.map(i => i.Revenue),
+            backgroundColor: ["#ef4444","#f87171","#fca5a5"], borderRadius: 2, borderSkipped: false }]
+        },
+        options: { indexAxis: "y", responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxisHoriz("₹"), y: yAxisHoriz() } }
+      });
+
+      // Low Products — Profit
+      destroyChart("lowProfit");
+      chartInstances["lowProfit"] = new Chart(
+        document.getElementById("lowProfit").getContext("2d"), {
+        type: "bar",
+        data: { labels: lowLabels,
+          datasets: [{ label: "Profit", data: data.low_products.map(i => i.Profit),
+            backgroundColor: ["#ef4444","#f87171","#fca5a5"], borderRadius: 2, borderSkipped: false }]
+        },
+        options: { indexAxis: "y", responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxisHoriz("₹"), y: yAxisHoriz() } }
+      });
+
+      // Profit Margin
+      destroyChart("profitMarginChart");
+      chartInstances["profitMarginChart"] = new Chart(
+        document.getElementById("profitMarginChart").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: data.profit_margin_category.map(i => i.Category),
+          datasets: [{ label: "Profit Margin %", data: data.profit_margin_category.map(i => i.Profit_Margin),
+            backgroundColor: PALETTE, borderRadius: 2, borderSkipped: false }]
+        },
+        options: { responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxis(),
+            y: { beginAtZero: true, grid: { color: gridColor },
+              ticks: { color: tickColor, font: baseFont, callback: v => v.toFixed(1) + "%" } } } }
+      });
+
+      // Order Volume
+      destroyChart("orderVolumeChart");
+      chartInstances["orderVolumeChart"] = new Chart(
+        document.getElementById("orderVolumeChart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: data.order_volume.map(i => i.Month),
+          datasets: [{ label: "Orders", data: data.order_volume.map(i => i.Orders),
+            borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.10)",
+            borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: "#6366f1",
+            fill: true, tension: 0.4 }]
+        },
+        options: { responsive: true,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: { x: xAxis(), y: { beginAtZero: true, grid: { color: gridColor },
+            ticks: { color: tickColor, font: baseFont } } } }
+      });
+
+      // Category Growth
+      destroyChart("categoryGrowthChart");
+      const growthData  = data.category_growth;
+      const gMonths     = [...new Set(growthData.map(i => i.Month))];
+      const gCategories = [...new Set(growthData.map(i => i.Category))];
+      chartInstances["categoryGrowthChart"] = new Chart(
+        document.getElementById("categoryGrowthChart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: gMonths,
+          datasets: gCategories.map((cat, idx) => ({
+            label: cat,
+            data: gMonths.map(m => {
+              const r = growthData.find(i => i.Month === m && i.Category === cat);
+              return r ? r.Revenue : 0;
+            }),
+            borderColor: PALETTE[idx % PALETTE.length],
+            backgroundColor: "transparent",
+            borderWidth: 2, pointRadius: 3, tension: 0.4, fill: false
+          }))
+        },
+        options: { responsive: true,
+          plugins: { legend: legendStyle("top"), tooltip: tooltipStyle },
+          scales: { x: xAxis(), y: yAxis("₹") } }
+      });
+
+    })
+    .catch(err => console.error("Error:", err));
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadFilterOptions();
+  loadSalesAnalysis();
+});
+</script>
+</body>
+</html>

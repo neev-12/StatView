@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView — Data Upload</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}" class="active">Data Upload</a>
+      <a href="{{ url_for('sales') }}">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="#">Decision Support</a>
+      <a href="#">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="sa-page-header">
+    <div>
+      <h1 class="sa-title">Data Upload</h1>
+      <p class="sa-subtitle">Upload your sales CSV or Excel file to power the entire dashboard.</p>
+    </div>
+  </div>
+
+  <!-- Upload Card -->
+  <div class="upload-card">
+    <div class="upload-icon">📂</div>
+    <p class="upload-instructions">Select a <strong>.csv</strong> or <strong>.xlsx</strong> file from your device.</p>
+    <div class="upload-row">
+      <input type="file" id="fileInput" accept=".csv,.xlsx">
+      <button onclick="uploadFile()">Upload</button>
+    </div>
+    <p class="upload-status" id="uploadStatus"></p>
+  </div>
+
+  <!-- Column Reference -->
+  <div class="schema-section">
+    <h2 class="schema-title">Required File Format</h2>
+    <p class="schema-desc">Your file must contain the following 8 columns exactly as named below. Column order does not matter.</p>
+
+    <div class="schema-table-wrap">
+      <table class="schema-table">
+        <thead>
+          <tr>
+            <th>Column Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Order_ID</code></td>
+            <td><span class="type-badge type-num">Number</span></td>
+            <td>Unique identifier for each order</td>
+            <td>1001</td>
+          </tr>
+          <tr>
+            <td><code>Order_Date</code></td>
+            <td><span class="type-badge type-date">Date</span></td>
+            <td>Date the order was placed — format must be YYYY-MM-DD</td>
+            <td>2024-03-15</td>
+          </tr>
+          <tr>
+            <td><code>Product_Name</code></td>
+            <td><span class="type-badge type-text">Text</span></td>
+            <td>Name of the product sold</td>
+            <td>Laptop</td>
+          </tr>
+          <tr>
+            <td><code>Category</code></td>
+            <td><span class="type-badge type-text">Text</span></td>
+            <td>Product category grouping</td>
+            <td>Electronics</td>
+          </tr>
+          <tr>
+            <td><code>Quantity</code></td>
+            <td><span class="type-badge type-num">Number</span></td>
+            <td>Number of units sold in the order</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <td><code>Selling_Price</code></td>
+            <td><span class="type-badge type-num">Number</span></td>
+            <td>Price per unit at which the product was sold</td>
+            <td>45000</td>
+          </tr>
+          <tr>
+            <td><code>Cost_Price</code></td>
+            <td><span class="type-badge type-num">Number</span></td>
+            <td>Cost per unit to acquire or produce the product</td>
+            <td>30000</td>
+          </tr>
+          <tr>
+            <td><code>Region</code></td>
+            <td><span class="type-badge type-text">Text</span></td>
+            <td>Geographic region where the order was placed</td>
+            <td>Mumbai</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+function uploadFile() {
+    const fileInput = document.getElementById("fileInput");
+    const status = document.getElementById("uploadStatus");
+
+    if (!fileInput.files.length) {
+        status.textContent = "Please select a file first.";
+        status.style.color = "#ef4444";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    status.textContent = "Uploading...";
+    status.style.color = "#6b7280";
+
+    fetch("/upload", {
+        method: "POST",
+        body: formData
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) {
+            status.textContent = result.error;
+            status.style.color = "#ef4444";
+            return;
+        }
+        window.location.href = "/";
+    })
+    .catch(() => {
+        status.textContent = "Upload failed. Please try again.";
+        status.style.color = "#ef4444";
+    });
+}
+</script>
+</body>
+</html>
