@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView — Decision Support</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* ── Decision Support Page Styles ── */
+
+  .ds-goal-panel {
+    background: white;
+    border-radius: 18px;
+    padding: 28px 32px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+  }
+
+  .ds-goal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .ds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ds-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .ds-input, .ds-select {
+    background: #f9fafb;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: #1f2937;
+    font-family: "Segoe UI", sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .ds-input:focus, .ds-select:focus {
+    border-color: #0ea5a4;
+  }
+
+  .ds-cat-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .ds-cat-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #f3f4f6;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .ds-cat-chip input { display: none; }
+
+  .ds-cat-chip.selected {
+    background: #f0fdfa;
+    border-color: #0ea5a4;
+    color: #0d9488;
+  }
+
+  .ds-run-btn {
+    background: linear-gradient(135deg, #0ea5a4, #0891b2);
+    border: none;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 32px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ds-run-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .ds-run-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Results area */
+  #ds-results { display: none; }
+
+  /* Projected outcome strip */
+  .ds-outcome-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .ds-outcome-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ds-outcome-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .ds-outcome-baseline {
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  .ds-outcome-projected {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0ea5a4;
+  }
+
+  .ds-outcome-delta {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .ds-outcome-delta.positive { color: #16a34a; }
+  .ds-outcome-delta.negative { color: #dc2626; }
+
+  /* Achievement bar */
+  .ds-achieve-wrap {
+    background: white;
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+  }
+
+  .ds-achieve-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .ds-achieve-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .ds-achieve-pct {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0ea5a4;
+  }
+
+  .ds-bar-track {
+    background: #f3f4f6;
+    border-radius: 99px;
+    height: 12px;
+    overflow: hidden;
+  }
+
+  .ds-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #0ea5a4, #6366f1);
+    transition: width 0.8s ease;
+  }
+
+  /* Insights */
+  .ds-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .ds-insight.success { background: #f0fdf4; color: #166534; }
+  .ds-insight.warning { background: #fffbeb; color: #92400e; }
+  .ds-insight.caution { background: #fef2f2; color: #991b1b; }
+  .ds-insight.info    { background: #eef2ff; color: #3730a3; }
+
+  .ds-insight-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  /* Recommendations table */
+  .rec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .rec-table thead tr {
+    border-bottom: 2px solid #f3f4f6;
+  }
+
+  .rec-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+
+  .rec-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #f9fafb;
+    color: #374151;
+    vertical-align: top;
+  }
+
+  .rec-table tbody tr:last-child td { border-bottom: none; }
+  .rec-table tbody tr:hover td { background: #f9fafb; }
+
+  .action-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .action-discount  { background: #eef2ff; color: #4f46e5; }
+  .action-increase  { background: #f0fdf4; color: #16a34a; }
+  .action-keep      { background: #f3f4f6; color: #6b7280; }
+
+  .impact-positive { color: #16a34a; font-weight: 700; }
+  .impact-negative { color: #dc2626; font-weight: 700; }
+
+  .explain-text {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+
+  /* Loading spinner */
+  .ds-spinner {
+    display: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .ds-empty {
+    text-align: center;
+    color: #9ca3af;
+    padding: 60px 20px;
+    font-size: 14px;
+  }
+
+  .ds-empty-icon { font-size: 36px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}">Data Upload</a>
+      <a href="{{ url_for('sales') }}">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="{{ url_for('decision') }}" class="active">Decision Support</a>
+      <a href="#">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="sa-page-header">
+    <div>
+      <h1 class="sa-title">Decision Support</h1>
+      <p class="sa-subtitle">Define your business goal and let the model recommend pricing changes to achieve it.</p>
+    </div>
+    <span class="panel-badge badge-indigo" style="font-size:12px; padding:6px 14px;">Price Elasticity Model</span>
+  </div>
+
+  <!-- Goal & Constraints Panel -->
+  <div class="ds-goal-panel">
+    <div class="panel-header" style="margin-bottom:0;">
+      <div>
+        <div class="panel-title">Define Your Goal & Constraints</div>
+        <div class="panel-sub">Set what you want to achieve and the boundaries the model must respect</div>
+      </div>
+      <span class="panel-badge badge-teal">Step 1</span>
+    </div>
+
+    <div class="ds-goal-grid">
+
+      <!-- Goal metric -->
+      <div class="ds-field">
+        <label class="ds-label">I want to improve</label>
+        <select class="ds-select" id="goal-metric">
+          <option value="revenue">Total Revenue</option>
+          <option value="profit">Total Profit</option>
+          <option value="volume">Order Volume</option>
+        </select>
+      </div>
+
+      <!-- Goal type -->
+      <div class="ds-field">
+        <label class="ds-label">By (type)</label>
+        <select class="ds-select" id="goal-type">
+          <option value="percent">Percentage (%)</option>
+          <option value="absolute">Absolute Value (₹)</option>
+        </select>
+      </div>
+
+      <!-- Goal value -->
+      <div class="ds-field">
+        <label class="ds-label">Target value</label>
+        <input class="ds-input" type="number" id="goal-value" value="20" min="1" placeholder="e.g. 20" />
+      </div>
+
+      <!-- Max discount -->
+      <div class="ds-field">
+        <label class="ds-label">Max discount allowed (%)</label>
+        <input class="ds-input" type="number" id="max-discount" value="20" min="0" max="50" placeholder="e.g. 20" />
+      </div>
+
+      <!-- Min margin -->
+      <div class="ds-field">
+        <label class="ds-label">Min margin to maintain (%)</label>
+        <input class="ds-input" type="number" id="min-margin" value="10" min="0" max="100" placeholder="e.g. 10" />
+      </div>
+
+    </div>
+
+    <!-- Category filter -->
+    <div style="margin-top:20px;">
+      <div class="ds-label" style="margin-bottom:8px;">Focus on categories (leave all unselected for all)</div>
+      <div class="ds-cat-checkboxes" id="cat-chips">
+        <span style="font-size:13px; color:#9ca3af;">Loading categories...</span>
+      </div>
+    </div>
+
+    <button class="ds-run-btn" id="run-btn" onclick="runDecisionSupport()">
+      <span id="run-label">▶ Run Analysis</span>
+      <div class="ds-spinner" id="run-spinner"></div>
+    </button>
+  </div>
+
+  <!-- Results -->
+  <div id="ds-results">
+
+    <!-- Achievement bar -->
+    <div class="ds-achieve-wrap">
+      <div class="ds-achieve-header">
+        <div class="ds-achieve-title" id="achieve-title">Goal Achievement</div>
+        <div class="ds-achieve-pct" id="achieve-pct">—</div>
+      </div>
+      <div class="ds-bar-track">
+        <div class="ds-bar-fill" id="achieve-bar" style="width:0%"></div>
+      </div>
+      <div style="font-size:12px; color:#9ca3af; margin-top:8px;" id="achieve-sub"></div>
+    </div>
+
+    <!-- Projected outcome cards -->
+    <div class="ds-outcome-strip" id="outcome-strip"></div>
+
+    <!-- Insights + Recommendations -->
+    <section class="sa-grid sa-grid-40-60">
+
+      <!-- Insights panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Key Insights</div>
+            <div class="panel-sub">Model observations and risk flags</div>
+          </div>
+          <span class="panel-badge badge-amber">Insights</span>
+        </div>
+        <div id="insights-container"></div>
+      </div>
+
+      <!-- Before vs After chart -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Projected Impact by Category</div>
+            <div class="panel-sub">Revenue impact of recommended changes per category</div>
+          </div>
+          <span class="panel-badge badge-indigo">Projection</span>
+        </div>
+        <canvas id="impact-chart" height="100"></canvas>
+      </div>
+
+    </section>
+
+    <!-- Recommendations table -->
+    <section class="sa-grid sa-grid-full">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Recommended Pricing Actions</div>
+            <div class="panel-sub">Suggested price or discount changes per category to achieve your goal</div>
+          </div>
+          <span class="panel-badge badge-teal">Recommendations</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="rec-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Action</th>
+                <th>Current Price</th>
+                <th>Suggested Price</th>
+                <th>Change</th>
+                <th>Margin (Before → After)</th>
+                <th>Revenue Impact</th>
+                <th>Explanation</th>
+              </tr>
+            </thead>
+            <tbody id="rec-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Empty state (before first run) -->
+  <div id="ds-empty">
+    <div class="ds-empty">
+      <div class="ds-empty-icon">🎯</div>
+      <div style="font-weight:700; color:#374151; margin-bottom:6px;">No analysis run yet</div>
+      <div>Set your goal and constraints above, then click <strong>Run Analysis</strong>.</div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+let impactChart = null;
+
+// ── Load category chips on page load ────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/decision-categories")
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) return;
+      const container = document.getElementById("cat-chips");
+      container.innerHTML = "";
+      data.categories.forEach(cat => {
+        const chip = document.createElement("label");
+        chip.className = "ds-cat-chip";
+        chip.innerHTML = `<input type="checkbox" value="${cat}" /> ${cat}`;
+        chip.addEventListener("click", () => {
+          chip.classList.toggle("selected");
+        });
+        container.appendChild(chip);
+      });
+    })
+    .catch(() => {
+      document.getElementById("cat-chips").innerHTML =
+        "<span style='font-size:13px;color:#9ca3af;'>Upload a dataset first.</span>";
+    });
+});
+
+// ── Run analysis ─────────────────────────────────────────────────────────────
+function runDecisionSupport() {
+  const btn     = document.getElementById("run-btn");
+  const label   = document.getElementById("run-label");
+  const spinner = document.getElementById("run-spinner");
+
+  // Gather inputs
+  const goalMetric  = document.getElementById("goal-metric").value;
+  const goalType    = document.getElementById("goal-type").value;
+  const goalValue   = parseFloat(document.getElementById("goal-value").value);
+  const maxDiscount = parseFloat(document.getElementById("max-discount").value);
+  const minMargin   = parseFloat(document.getElementById("min-margin").value);
+
+  const selectedChips = document.querySelectorAll(".ds-cat-chip.selected input");
+  const focusCats = selectedChips.length > 0
+    ? Array.from(selectedChips).map(c => c.value)
+    : null;
+
+  if (isNaN(goalValue) || goalValue <= 0) {
+    alert("Please enter a valid target value.");
+    return;
+  }
+
+  // Loading state
+  btn.disabled      = true;
+  label.textContent = "Running...";
+  spinner.style.display = "block";
+
+  fetch("/decision-support", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      goal_metric:       goalMetric,
+      goal_type:         goalType,
+      goal_value:        goalValue,
+      max_discount:      maxDiscount,
+      min_margin:        minMargin,
+      focus_categories:  focusCats
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    renderResults(data);
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Something went wrong. Check the console.");
+  })
+  .finally(() => {
+    btn.disabled          = false;
+    label.textContent     = "▶ Run Analysis";
+    spinner.style.display = "none";
+  });
+}
+
+// ── Render results ────────────────────────────────────────────────────────────
+function renderResults(data) {
+  document.getElementById("ds-empty").style.display   = "none";
+  document.getElementById("ds-results").style.display = "block";
+
+  const { baseline, projected, target, gap, goal_metric,
+          recommendations, insights } = data;
+
+  const fmt = v => "₹" + Math.round(v).toLocaleString();
+  const fmtV = v => Math.round(v).toLocaleString();
+
+  // ── Achievement bar ────────────────────────────────────────────────────────
+  const pct     = Math.min(projected.achievement_pct, 100);
+  const metricLabel = { revenue: "Revenue", profit: "Profit", volume: "Order Volume" }[goal_metric];
+
+  document.getElementById("achieve-title").textContent =
+    `Goal Achievement — ${metricLabel}`;
+  document.getElementById("achieve-pct").textContent =
+    projected.achievement_pct + "%";
+  document.getElementById("achieve-bar").style.width = pct + "%";
+  document.getElementById("achieve-bar").style.background =
+    projected.feasible
+      ? "linear-gradient(90deg,#0ea5a4,#6366f1)"
+      : "linear-gradient(90deg,#f59e0b,#ef4444)";
+  document.getElementById("achieve-sub").textContent =
+    projected.feasible
+      ? "✓ Goal appears achievable with the recommended changes."
+      : "⚠ Goal may be difficult to fully achieve within current constraints.";
+
+  // ── Outcome cards ──────────────────────────────────────────────────────────
+  const strip = document.getElementById("outcome-strip");
+  strip.innerHTML = "";
+
+  const metrics = [
+    { key: "revenue", label: "Projected Revenue",      base: baseline.revenue, proj: projected.revenue, prefix: "₹" },
+    { key: "profit",  label: "Projected Profit",       base: baseline.profit,  proj: projected.profit,  prefix: "₹" },
+    { key: "volume",  label: "Projected Order Volume", base: baseline.volume,  proj: projected.volume,  prefix: ""  },
+    { key: "margin",  label: "Projected Avg Margin",   base: baseline.margin,  proj: projected.margin,  prefix: "",  suffix: "%" }
+  ];
+
+  metrics.forEach(m => {
+    const delta    = m.proj - m.base;
+    const deltaPct = m.base !== 0 ? ((delta / m.base) * 100).toFixed(1) : 0;
+    const positive = delta >= 0;
+    const suf      = m.suffix || "";
+    const pre      = m.prefix;
+
+    strip.innerHTML += `
+      <div class="ds-outcome-card">
+        <div class="ds-outcome-label">${m.label}</div>
+        <div class="ds-outcome-baseline">Baseline: ${pre}${Math.round(m.base).toLocaleString()}${suf}</div>
+        <div class="ds-outcome-projected">${pre}${Math.round(m.proj).toLocaleString()}${suf}</div>
+        <div class="ds-outcome-delta ${positive ? "positive" : "negative"}">
+          ${positive ? "▲" : "▼"} ${Math.abs(deltaPct)}% vs baseline
+        </div>
+      </div>`;
+  });
+
+  // Target card
+  strip.innerHTML += `
+    <div class="ds-outcome-card">
+      <div class="ds-outcome-label">Your Target</div>
+      <div class="ds-outcome-baseline">Gap to close: ${fmt(Math.abs(gap))}</div>
+      <div class="ds-outcome-projected" style="color:#6366f1;">${fmt(target)}</div>
+      <div class="ds-outcome-delta ${projected.feasible ? "positive" : "negative"}">
+        ${projected.feasible ? "✓ On track" : "⚠ Partially achievable"}
+      </div>
+    </div>`;
+
+  // ── Insights ───────────────────────────────────────────────────────────────
+  const insightsEl = document.getElementById("insights-container");
+  insightsEl.innerHTML = "";
+  const iconMap = { success: "✅", warning: "⚠️", caution: "🔴", info: "ℹ️" };
+  insights.forEach(ins => {
+    insightsEl.innerHTML += `
+      <div class="ds-insight ${ins.type}">
+        <span class="ds-insight-icon">${iconMap[ins.type] || "ℹ️"}</span>
+        <span>${ins.message}</span>
+      </div>`;
+  });
+
+  if (insights.length === 0) {
+    insightsEl.innerHTML = `<div class="ds-insight info">
+      <span class="ds-insight-icon">ℹ️</span>
+      <span>No specific flags for this scenario.</span>
+    </div>`;
+  }
+
+  // ── Impact chart ───────────────────────────────────────────────────────────
+  const chartLabels  = recommendations.map(r => r.category);
+  const chartImpact  = recommendations.map(r => r.revenue_impact);
+  const chartColors  = chartImpact.map(v =>
+    v >= 0 ? "rgba(14,165,164,0.8)" : "rgba(239,68,68,0.8)"
+  );
+
+  if (impactChart) impactChart.destroy();
+  impactChart = new Chart(
+    document.getElementById("impact-chart").getContext("2d"),
+    {
+      type: "bar",
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          label: "Revenue Impact (₹)",
+          data: chartImpact,
+          backgroundColor: chartColors,
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "rgba(17,24,39,0.88)",
+            titleColor: "#f9fafb",
+            bodyColor: "#d1d5db",
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: {
+              label: ctx => (ctx.raw >= 0 ? "+" : "") + "₹" + Math.round(ctx.raw).toLocaleString()
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 12 } } },
+          y: {
+            grid: { color: "rgba(0,0,0,0.05)" },
+            ticks: {
+              color: "#9ca3af",
+              font: { size: 12 },
+              callback: v => (v >= 0 ? "+" : "") + "₹" + v.toLocaleString()
+            }
+          }
+        }
+      }
+    }
+  );
+
+  // ── Recommendations table ──────────────────────────────────────────────────
+  const tbody = document.getElementById("rec-table-body");
+  tbody.innerHTML = "";
+  recommendations.forEach(r => {
+    const actionClass = { discount: "action-discount", increase: "action-increase", keep: "action-keep" }[r.action] || "action-keep";
+    const actionLabel = { discount: `Discount ${r.discount_pct}%`, increase: `Increase ${r.price_change_pct}%`, keep: "Keep" }[r.action] || "Keep";
+    const impactClass = r.revenue_impact >= 0 ? "impact-positive" : "impact-negative";
+    const impactSign  = r.revenue_impact >= 0 ? "+" : "";
+
+    tbody.innerHTML += `
+      <tr>
+        <td style="font-weight:600; color:#111827;">${r.category}</td>
+        <td><span class="action-pill ${actionClass}">${actionLabel}</span></td>
+        <td>₹${r.current_price.toLocaleString()}</td>
+        <td style="font-weight:700;">₹${r.suggested_price.toLocaleString()}</td>
+        <td class="${r.price_change_pct >= 0 ? "impact-positive" : "impact-negative"}">
+          ${r.price_change_pct >= 0 ? "+" : ""}${r.price_change_pct}%
+        </td>
+        <td>
+          <span style="color:#6b7280;">${r.current_margin}%</span>
+          <span style="color:#9ca3af;"> → </span>
+          <span style="font-weight:700;color:#111827;">${r.new_margin}%</span>
+        </td>
+        <td class="${impactClass}">${impactSign}₹${Math.round(Math.abs(r.revenue_impact)).toLocaleString()}</td>
+        <td><div class="explain-text">${r.explanation}</div></td>
+      </tr>`;
+  });
+}
+</script>
+</body>
+</html>
