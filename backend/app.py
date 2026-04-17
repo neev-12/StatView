@@ -1,4 +1,3 @@
-
 from flask import Flask, request, session, jsonify, render_template
 import os
 from analysis import basic_sales_analysis, sales_tab
@@ -149,6 +148,30 @@ def decision_categories():
     return jsonify({
         "categories": sorted(df["Category"].dropna().unique().tolist())
     })
+
+@app.route("/whatif")
+def whatif():
+    return render_template("whatif.html")
+
+@app.route("/what-if", methods=["POST"])
+def whatif_analysis():
+    df, err, code = load_df()
+    if err:
+        return err, code
+
+    body = request.get_json()
+    if not body:
+        return jsonify({"error": "No input provided"}), 400
+
+    from analysis import get_whatif
+    result = get_whatif(
+        df,
+        price_change_pct  = float(body.get("price_change",  0)),
+        cost_change_pct   = float(body.get("cost_change",   0)),
+        volume_change_pct = float(body.get("volume_change", 0)),
+        categories        = body.get("categories", None)
+    )
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(debug=True)

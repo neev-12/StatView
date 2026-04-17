@@ -294,3 +294,61 @@ def get_forecast(df):
 if __name__ == "__main__":
     results = basic_sales_analysis("../data/sales_data.csv")
     print(results)
+
+def get_whatif(df, price_change_pct, cost_change_pct, volume_change_pct, categories=None):
+    df = df.copy()
+
+    # ── Original metrics ────────────────────────────────────────────────────
+    df["Revenue"] = df["Quantity"] * df["Selling_Price"]
+    df["Profit"]  = (df["Selling_Price"] - df["Cost_Price"]) * df["Quantity"]
+
+    orig_rev  = float(df["Revenue"].sum())
+    orig_prof = float(df["Profit"].sum())
+    orig_vol  = int(df["Quantity"].sum())
+    orig_margin = round(orig_prof / orig_rev * 100, 2) if orig_rev else 0
+
+    orig_cat = (
+        df.groupby("Category")
+        .agg({"Revenue": "sum", "Profit": "sum"})
+        .reset_index()
+        .to_dict(orient="records")
+    )
+
+    # ── Apply scenario ───────────────────────────────────────────────────────
+    sdf = df.copy()
+
+    mask = (
+        sdf["Category"].isin(categories)
+        if categories
+        else pd.Series([True] * len(sdf), index=sdf.index)
+    )
+
+    sdf.loc[mask, "Selling_Price"] = sdf.loc[mask, "Selling_Price"] * (1 + price_change_pct / 100)
+    sdf.loc[mask, "Cost_Price"]    = sdf.loc[mask, "Cost_Price"]    * (1 + cost_change_pct  / 100)
+    sdf.loc[mask, "Quantity"]      = (sdf.loc[mask, "Quantity"] * (1 + volume_change_pct / 100)).round().astype(int)
+
+    sdf["Revenue"] = sdf["Quantity"] * sdf["Selling_Price"]
+    sdf["Profit"]  = (sdf["Selling_Price"] - sdf["Cost_Price"]) * sdf["Quantity"]
+
+    scen_rev   = float(sdf["Revenue"].sum())
+    scen_prof  = float(sdf["Profit"].sum())
+    scen_vol   = int(sdf["Quantity"].sum())
+    scen_margin = round(scen_prof / scen_rev * 100, 2) if scen_rev else 0
+
+    scen_cat = (
+        sdf.groupby("Category")
+        .agg({"Revenue": "sum", "Profit": "sum"})
+        .reset_index()
+        .to_dict(orient="records")
+    )
+
+    return {
+        "original": {
+            "kpis":       {"revenue": orig_rev,  "profit": orig_prof,  "volume": orig_vol,  "margin": orig_margin},
+            "categories": orig_cat
+        },
+        "scenario": {
+            "kpis":       {"revenue": scen_rev,  "profit": scen_prof,  "volume": scen_vol,  "margin": scen_margin},
+            "categories": scen_cat
+        }
+    }

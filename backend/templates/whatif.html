@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StatView — What-If Analysis</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+
+  /* ── Sliders ─────────────────────────────────────────────────────────── */
+
+  .wi-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .wi-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .wi-slider-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .wi-slider-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0ea5a4;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  .wi-slider-value.negative { color: #ef4444; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 99px;
+    background: #e5e7eb;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0ea5a4;
+    border: 3px solid white;
+    box-shadow: 0 1px 6px rgba(14,165,164,0.4);
+    cursor: pointer;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0ea5a4;
+    border: 3px solid white;
+    box-shadow: 0 1px 6px rgba(14,165,164,0.4);
+    cursor: pointer;
+  }
+
+  .wi-slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #d1d5db;
+    margin-top: -2px;
+    padding: 0 2px;
+  }
+
+  /* ── Controls panel ──────────────────────────────────────────────────── */
+
+  .wi-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 960px) {
+    .wi-layout { grid-template-columns: 1fr; }
+  }
+
+  .wi-controls {
+    background: white;
+    border-radius: 18px;
+    padding: 26px 24px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    position: sticky;
+    top: 76px;
+  }
+
+  .wi-controls-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: -8px;
+  }
+
+  .wi-controls-sub {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 4px;
+  }
+
+  .wi-divider {
+    border: none;
+    border-top: 1px solid #f3f4f6;
+    margin: -6px 0;
+  }
+
+  /* ── Category chips ──────────────────────────────────────────────────── */
+
+  .wi-cat-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .wi-cat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .wi-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #f3f4f6;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.18s;
+    user-select: none;
+  }
+
+  .wi-chip:hover {
+    border-color: #0ea5a4;
+    color: #0d9488;
+  }
+
+  .wi-chip.selected {
+    background: #f0fdfa;
+    border-color: #0ea5a4;
+    color: #0d9488;
+  }
+
+  .wi-chip-all {
+    background: #0ea5a4;
+    border-color: #0ea5a4;
+    color: white;
+  }
+
+  .wi-chip-all:hover {
+    background: #0d9488;
+    color: white;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+
+  .wi-btn-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .wi-run-btn {
+    flex: 1;
+    background: linear-gradient(135deg, #0ea5a4, #0891b2);
+    border: none;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+
+  .wi-run-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .wi-reset-btn {
+    background: transparent;
+    border: 1.5px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .wi-reset-btn:hover {
+    border-color: #9ca3af;
+    color: #374151;
+  }
+
+  /* ── KPI comparison cards ────────────────────────────────────────────── */
+
+  .wi-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .wi-kpi-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    border-top: 3px solid transparent;
+    transition: border-color 0.3s;
+  }
+
+  .wi-kpi-card.positive { border-top-color: #10b981; }
+  .wi-kpi-card.negative { border-top-color: #ef4444; }
+  .wi-kpi-card.neutral  { border-top-color: #e5e7eb; }
+
+  .wi-kpi-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .wi-kpi-compare {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .wi-kpi-orig {
+    font-size: 18px;
+    font-weight: 600;
+    color: #9ca3af;
+  }
+
+  .wi-arrow {
+    font-size: 14px;
+    color: #d1d5db;
+    flex-shrink: 0;
+  }
+
+  .wi-kpi-scen {
+    font-size: 22px;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .wi-kpi-delta {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+
+  .wi-kpi-delta.pos { background: #f0fdf4; color: #16a34a; }
+  .wi-kpi-delta.neg { background: #fef2f2; color: #dc2626; }
+  .wi-kpi-delta.neu { background: #f3f4f6; color: #9ca3af; }
+
+  /* ── Insight strip ───────────────────────────────────────────────────── */
+
+  .wi-insight-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .wi-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: white;
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.5;
+  }
+
+  .wi-insight-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────── */
+
+  .wi-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #9ca3af;
+  }
+
+  .wi-empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .wi-empty-title { font-size: 15px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+  .wi-empty-sub { font-size: 13px; }
+
+  /* ── Loading spinner ─────────────────────────────────────────────────── */
+
+  .wi-loading {
+    text-align: center;
+    padding: 50px;
+    color: #9ca3af;
+    font-size: 14px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .wi-spinner {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #0ea5a4;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+  }
+
+</style>
+</head>
+<body>
+
+<header class="sv-navbar">
+  <div class="sv-nav-inner">
+    <div class="sv-brand">
+      <div class="sv-logo">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" width="80%">
+      </div>
+      <div>
+        <div class="sv-title">StatView</div>
+        <div class="sv-subtitle">Analytics Dashboard</div>
+      </div>
+    </div>
+    <nav class="sv-links">
+      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('upload_page') }}">Data Upload</a>
+      <a href="{{ url_for('sales') }}">Sales Analysis</a>
+      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="{{ url_for('decision') }}">Decision Support</a>
+      <a href="{{ url_for('whatif') }}" class="active">What-If</a>
+      <a href="#">Recommendations</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Page Header -->
+  <div class="sa-page-header">
+    <div>
+      <h1 class="sa-title">What-If Analysis</h1>
+      <p class="sa-subtitle">Simulate price, cost, and volume changes — then compare against your original data.</p>
+    </div>
+    <span class="panel-badge badge-amber" style="font-size:12px; padding:6px 14px;">Scenario Simulator</span>
+  </div>
+
+  <!-- Main layout: controls (left) | KPI cards (right) -->
+  <div class="wi-layout">
+
+    <!-- Controls -->
+    <aside class="wi-controls">
+      <div>
+        <div class="wi-controls-title">Build Your Scenario</div>
+        <div class="wi-controls-sub">Adjust levers and click Run</div>
+      </div>
+
+      <hr class="wi-divider">
+
+      <!-- Category chips -->
+      <div>
+        <div class="wi-cat-label">Apply Changes To</div>
+        <div class="wi-cat-chips" id="catChips">
+          <span class="wi-chip wi-chip-all selected" id="chip-all" onclick="toggleAll()">All Categories</span>
+        </div>
+      </div>
+
+      <hr class="wi-divider">
+
+      <!-- Sliders -->
+      <div class="wi-slider-group">
+        <div class="wi-slider-header">
+          <span class="wi-slider-label">💰 Selling Price Change</span>
+          <span class="wi-slider-value" id="priceVal">0%</span>
+        </div>
+        <input type="range" id="priceSlider" min="-50" max="50" value="0"
+               oninput="updateSlider('price')">
+        <div class="wi-slider-ticks"><span>−50%</span><span>0</span><span>+50%</span></div>
+      </div>
+
+      <div class="wi-slider-group">
+        <div class="wi-slider-header">
+          <span class="wi-slider-label">🏭 Cost Price Change</span>
+          <span class="wi-slider-value" id="costVal">0%</span>
+        </div>
+        <input type="range" id="costSlider" min="-50" max="50" value="0"
+               oninput="updateSlider('cost')">
+        <div class="wi-slider-ticks"><span>−50%</span><span>0</span><span>+50%</span></div>
+      </div>
+
+      <div class="wi-slider-group">
+        <div class="wi-slider-header">
+          <span class="wi-slider-label">📦 Volume Change</span>
+          <span class="wi-slider-value" id="volumeVal">0%</span>
+        </div>
+        <input type="range" id="volumeSlider" min="-50" max="50" value="0"
+               oninput="updateSlider('volume')">
+        <div class="wi-slider-ticks"><span>−50%</span><span>0</span><span>+50%</span></div>
+      </div>
+
+      <hr class="wi-divider">
+
+      <div class="wi-btn-row">
+        <button class="wi-run-btn" onclick="runScenario()">▶ Run Scenario</button>
+        <button class="wi-reset-btn" onclick="resetAll()" title="Reset">↺</button>
+      </div>
+    </aside>
+
+    <!-- KPI comparison cards -->
+    <div>
+      <div class="wi-kpi-grid" id="kpiGrid">
+        <div style="grid-column: 1 / -1;">
+          <div class="wi-empty">
+            <div class="wi-empty-icon">🔮</div>
+            <div class="wi-empty-title">No scenario run yet</div>
+            <div class="wi-empty-sub">Adjust the levers on the left and click <strong>Run Scenario</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Insights -->
+  <div class="wi-insight-strip" id="insightStrip" style="display:none;"></div>
+
+  <!-- Charts -->
+  <section class="sa-grid sa-grid-50-50" id="chartsSection" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Revenue by Category</div>
+          <div class="panel-sub">Original vs Scenario</div>
+        </div>
+        <span class="panel-badge badge-teal">Revenue</span>
+      </div>
+      <canvas id="revenueChart" height="180"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Profit by Category</div>
+          <div class="panel-sub">Original vs Scenario</div>
+        </div>
+        <span class="panel-badge badge-green">Profit</span>
+      </div>
+      <canvas id="profitChart" height="180"></canvas>
+    </div>
+  </section>
+
+</main>
+
+<script>
+
+// ── State ────────────────────────────────────────────────────────────────────
+let allCategories  = [];
+let selectedCats   = [];       // empty = all
+let revenueChart   = null;
+let profitChart    = null;
+
+// ── Boot: load categories then run baseline ──────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/decision-categories")
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) return;
+      allCategories = data.categories;
+      renderChips();
+      runScenario();             // show baseline (0% changes) on load
+    })
+    .catch(() => {});
+});
+
+// ── Category chips ────────────────────────────────────────────────────────────
+function renderChips() {
+  const container = document.getElementById("catChips");
+  container.innerHTML =
+    `<span class="wi-chip wi-chip-all ${selectedCats.length === 0 ? "selected" : ""}"
+           id="chip-all" onclick="toggleAll()">All Categories</span>`;
+
+  allCategories.forEach(cat => {
+    const sel = selectedCats.includes(cat) ? "selected" : "";
+    container.innerHTML +=
+      `<span class="wi-chip ${sel}" onclick="toggleCat('${cat}')">${cat}</span>`;
+  });
+}
+
+function toggleAll() {
+  selectedCats = [];
+  renderChips();
+}
+
+function toggleCat(cat) {
+  if (selectedCats.includes(cat)) {
+    selectedCats = selectedCats.filter(c => c !== cat);
+  } else {
+    selectedCats.push(cat);
+  }
+  renderChips();
+}
+
+// ── Sliders ───────────────────────────────────────────────────────────────────
+function updateSlider(key) {
+  const val = +document.getElementById(key + "Slider").value;
+  const el  = document.getElementById(key + "Val");
+  el.textContent = (val >= 0 ? "+" : "") + val + "%";
+  el.className   = "wi-slider-value" + (val < 0 ? " negative" : "");
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll() {
+  ["price", "cost", "volume"].forEach(k => {
+    document.getElementById(k + "Slider").value = 0;
+    updateSlider(k);
+  });
+  selectedCats = [];
+  renderChips();
+  runScenario();
+}
+
+// ── Run Scenario ─────────────────────────────────────────────────────────────
+function runScenario() {
+  const priceChange  = +document.getElementById("priceSlider").value;
+  const costChange   = +document.getElementById("costSlider").value;
+  const volumeChange = +document.getElementById("volumeSlider").value;
+
+  // Show loading in kpi grid
+  document.getElementById("kpiGrid").innerHTML =
+    `<div style="grid-column:1/-1;"><div class="wi-loading">
+      <div class="wi-spinner"></div><br>Running scenario...
+    </div></div>`;
+
+  const body = {
+    price_change:  priceChange,
+    cost_change:   costChange,
+    volume_change: volumeChange,
+    categories:    selectedCats.length > 0 ? selectedCats : null
+  };
+
+  fetch("/what-if", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      document.getElementById("kpiGrid").innerHTML =
+        `<div style="grid-column:1/-1;" class="wi-empty">
+          <div class="wi-empty-icon">⚠️</div>
+          <div class="wi-empty-title">${data.error}</div>
+          <div class="wi-empty-sub">Please upload a dataset first.</div>
+        </div>`;
+      return;
+    }
+    renderResults(data, priceChange, costChange, volumeChange);
+  })
+  .catch(() => {
+    document.getElementById("kpiGrid").innerHTML =
+      `<div style="grid-column:1/-1;" class="wi-empty">
+        <div class="wi-empty-icon">❌</div>
+        <div class="wi-empty-title">Something went wrong</div>
+        <div class="wi-empty-sub">Please try again.</div>
+      </div>`;
+  });
+}
+
+// ── Render Results ────────────────────────────────────────────────────────────
+function renderResults(data, priceChg, costChg, volChg) {
+  const orig = data.original;
+  const scen = data.scenario;
+  const isBaseline = priceChg === 0 && costChg === 0 && volChg === 0;
+
+  // ── KPI cards ─────────────────────────────────────────────────────────────
+  const metrics = [
+    { key: "revenue", label: "Total Revenue",     fmt: fmtCurrency, higherBetter: true },
+    { key: "profit",  label: "Total Profit",       fmt: fmtCurrency, higherBetter: true },
+    { key: "margin",  label: "Profit Margin",      fmt: v => v.toFixed(1) + "%", higherBetter: true },
+    { key: "volume",  label: "Units Sold (Volume)",fmt: v => v.toLocaleString(), higherBetter: true }
+  ];
+
+  let cardsHtml = "";
+  metrics.forEach(m => {
+    const ov = orig.kpis[m.key];
+    const sv = scen.kpis[m.key];
+    const delta    = sv - ov;
+    const deltaPct = ov !== 0 ? (delta / ov * 100) : 0;
+
+    let cardClass = "neutral", deltaClass = "neu", sign = "";
+    if (!isBaseline) {
+      const improved = m.higherBetter ? delta > 0 : delta < 0;
+      cardClass  = improved ? "positive" : (delta === 0 ? "neutral" : "negative");
+      deltaClass = improved ? "pos"      : (delta === 0 ? "neu"     : "neg");
+      sign = delta >= 0 ? "+" : "";
+    }
+
+    cardsHtml += `
+      <div class="wi-kpi-card ${cardClass}">
+        <div class="wi-kpi-name">${m.label}</div>
+        <div class="wi-kpi-compare">
+          <span class="wi-kpi-orig">${m.fmt(ov)}</span>
+          <span class="wi-arrow">→</span>
+          <span class="wi-kpi-scen">${m.fmt(sv)}</span>
+        </div>
+        ${isBaseline
+          ? `<span class="wi-kpi-delta neu">Baseline</span>`
+          : `<span class="wi-kpi-delta ${deltaClass}">${sign}${m.fmt(delta)} (${sign}${deltaPct.toFixed(1)}%)</span>`
+        }
+      </div>`;
+  });
+
+  document.getElementById("kpiGrid").innerHTML = cardsHtml;
+
+  // ── Insights ──────────────────────────────────────────────────────────────
+  const insightStrip = document.getElementById("insightStrip");
+  if (isBaseline) {
+    insightStrip.style.display = "none";
+  } else {
+    const insights = buildInsights(orig.kpis, scen.kpis, priceChg, costChg, volChg, selectedCats);
+    insightStrip.innerHTML = insights.map(i =>
+      `<div class="wi-insight">
+        <span class="wi-insight-icon">${i.icon}</span>
+        <span>${i.message}</span>
+      </div>`).join("");
+    insightStrip.style.display = "flex";
+  }
+
+  // ── Charts ────────────────────────────────────────────────────────────────
+  document.getElementById("chartsSection").style.display = "";
+
+  const origCatMap  = Object.fromEntries(orig.categories.map(c => [c.Category, c]));
+  const scenCatMap  = Object.fromEntries(scen.categories.map(c => [c.Category, c]));
+  const cats        = orig.categories.map(c => c.Category);
+
+  const origRevs    = cats.map(c => origCatMap[c]?.Revenue ?? 0);
+  const scenRevs    = cats.map(c => scenCatMap[c]?.Revenue ?? 0);
+  const origProfs   = cats.map(c => origCatMap[c]?.Profit  ?? 0);
+  const scenProfs   = cats.map(c => scenCatMap[c]?.Profit  ?? 0);
+
+  const chartOpts = (prefix) => ({
+    responsive: true,
+    plugins: {
+      legend: { position: "top", labels: { color: "#374151", font: { size: 12 }, boxWidth: 10 } },
+      tooltip: {
+        backgroundColor: "rgba(17,24,39,0.88)",
+        titleColor: "#f9fafb",
+        bodyColor: "#d1d5db",
+        padding: 10,
+        cornerRadius: 8,
+        callbacks: { label: ctx => " " + ctx.dataset.label + ": ₹" + Math.round(ctx.raw).toLocaleString() }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 12 } } },
+      y: { grid: { color: "rgba(0,0,0,0.05)" },
+           ticks: { color: "#9ca3af", font: { size: 12 },
+                    callback: v => "₹" + (v >= 1e5 ? (v/1e5).toFixed(1) + "L" : v.toLocaleString()) }}
+    }
+  });
+
+  if (revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(
+    document.getElementById("revenueChart").getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: cats,
+        datasets: [
+          { label: "Original",  data: origRevs, backgroundColor: "rgba(156,163,175,0.6)",  borderRadius: 4, borderSkipped: false },
+          { label: "Scenario",  data: scenRevs, backgroundColor: "rgba(14,165,164,0.85)",  borderRadius: 4, borderSkipped: false }
+        ]
+      },
+      options: chartOpts("rev")
+    }
+  );
+
+  if (profitChart) profitChart.destroy();
+  profitChart = new Chart(
+    document.getElementById("profitChart").getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: cats,
+        datasets: [
+          { label: "Original",  data: origProfs, backgroundColor: "rgba(156,163,175,0.6)",  borderRadius: 4, borderSkipped: false },
+          { label: "Scenario",  data: scenProfs, backgroundColor: "rgba(16,185,129,0.85)",  borderRadius: 4, borderSkipped: false }
+        ]
+      },
+      options: chartOpts("prof")
+    }
+  );
+}
+
+// ── Insights builder ──────────────────────────────────────────────────────────
+function buildInsights(orig, scen, priceChg, costChg, volChg, cats) {
+  const insights = [];
+  const scope    = cats.length > 0 ? cats.join(", ") : "all categories";
+  const revDelta = scen.revenue - orig.revenue;
+  const profDelta= scen.profit  - orig.profit;
+  const marginDelta = scen.margin - orig.margin;
+
+  if (revDelta > 0)
+    insights.push({ icon: "📈", message: `Revenue is projected to increase by ${fmtCurrency(Math.abs(revDelta))} (${pct(revDelta, orig.revenue)}) across ${scope}.` });
+  else if (revDelta < 0)
+    insights.push({ icon: "📉", message: `Revenue is projected to decrease by ${fmtCurrency(Math.abs(revDelta))} (${pct(revDelta, orig.revenue)}) across ${scope}.` });
+
+  if (profDelta > 0)
+    insights.push({ icon: "✅", message: `Profit improves by ${fmtCurrency(Math.abs(profDelta))} under this scenario.` });
+  else if (profDelta < 0)
+    insights.push({ icon: "⚠️", message: `Profit drops by ${fmtCurrency(Math.abs(profDelta))}. Watch margin compression — especially if cost and price move together.` });
+
+  if (priceChg > 0 && volChg === 0)
+    insights.push({ icon: "💡", message: `You're raising prices without simulating a volume drop. Consider pairing with a volume decrease to model realistic demand impact.` });
+
+  if (costChg > 0 && priceChg === 0)
+    insights.push({ icon: "⚠️", message: `Costs are rising but selling price is unchanged — this will compress your margin. Consider passing some cost on to the customer.` });
+
+  if (Math.abs(marginDelta) > 2)
+    insights.push({ icon: "📊", message: `Profit margin shifts from ${orig.margin.toFixed(1)}% to ${scen.margin.toFixed(1)}% — a ${marginDelta > 0 ? "+" : ""}${marginDelta.toFixed(1)}pp change.` });
+
+  return insights;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtCurrency(v) {
+  const abs = Math.abs(v);
+  if (abs >= 1e7)  return "₹" + (v/1e7).toFixed(2) + "Cr";
+  if (abs >= 1e5)  return "₹" + (v/1e5).toFixed(1)  + "L";
+  return "₹" + Math.round(v).toLocaleString();
+}
+
+function pct(delta, base) {
+  if (!base) return "0%";
+  return (delta / base * 100).toFixed(1) + "%";
+}
+
+</script>
+</body>
+</html>
