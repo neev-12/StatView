@@ -23,14 +23,13 @@
     </div>
 
     <nav class="sv-links">
-      <a href="{{ url_for('home') }}" class="active">Dashboard</a>
+      <a href="{{ url_for('home') }}">Dashboard</a>
       <a href="{{ url_for('upload_page') }}">Data Upload</a>
       <a href="{{ url_for('sales') }}">Sales Analysis</a>
       <a href="{{ url_for('predictive') }}">Predictive</a>
       <a href="{{ url_for('decision') }}">Decision Support</a>
       <a href="{{ url_for('whatif') }}">What-If</a>
-      <a href="#">Recommendations</a>
-      <a href="#about-section">About</a>
+      <a href="{{ url_for('about') }}">About</a>
     </nav>
   </div>
 </header>
@@ -165,51 +164,6 @@
     <div class="qtr-list" id="qtr-list"></div>
   </div>
 </section>
-
-<section id="about-section">
-    <h2 class="features-title">What you can do with StatView</h2>
-    <div class="features-grid">
-      <div class="feature-item">
-        <div class="feature-icon">📄</div>
-        <h3>Sales Analysis</h3>
-        <p>View e-commerce data analysed and simplied for you.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-icon">📊</div>
-        <h3>Sales Prediction</h3>
-        <p>View predicted sales over different quarters using past data.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-icon">💡</div>
-        <h3>Decision Support</h3>
-        <p>Confused with Decisions, Allow built in support system help.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-icon">☁️</div>
-        <h3>Connect to data</h3>
-        <p>Easily import your data from wherever it is—Excel workbooks, local databases, or the cloud.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-icon">📉</div>
-        <h3>Build a report</h3>
-        <p>Create and format visuals that present your data story in compelling and insightful ways.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-icon">📤</div>
-        <h3>What-if Analysis</h3>
-        <p>Alter Constraints as per need, and see how different scenarios work out.</p>
-        <div class="learn-more">Learn how</div>
-      </div>
-    </div>
-  </section>
-
-
-
 
 </main>
 <script>
