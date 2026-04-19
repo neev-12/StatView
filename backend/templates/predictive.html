@@ -24,10 +24,18 @@
       <a href="{{ url_for('home') }}">Dashboard</a>
       <a href="{{ url_for('upload_page') }}">Data Upload</a>
       <a href="{{ url_for('sales') }}">Sales Analysis</a>
-      <a href="{{ url_for('predictive') }}">Predictive</a>
+      <a href="{{ url_for('predictive') }}" class="active">Predictive</a>
       <a href="{{ url_for('decision') }}">Decision Support</a>
       <a href="{{ url_for('whatif') }}">What-If</a>
-      <a href="{{ url_for('about') }}">About</a>
+      <a href="#">About</a>
+      <a href="{{ url_for('logout') }}"
+         style="font-size:13px; font-weight:600; color:#374151; text-decoration:none;
+                border:1.5px solid #e5e7eb; border-radius:8px; padding:6px 14px;
+                transition:border-color 0.2s, color 0.2s;"
+         onmouseover="this.style.borderColor='#0ea5a4';this.style.color='#0ea5a4';"
+         onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151';">
+        Sign Out
+      </a>
     </nav>
   </div>
 </header>
@@ -42,8 +50,8 @@
     <span class="panel-badge badge-indigo" style="font-size:12px; padding: 6px 14px;">Linear Regression Model</span>
   </div>
 
-  <!-- Forecast KPI strip -->
-  <div class="qs-strip" id="forecast-strip">
+  <!-- Original KPI strip -->
+  <div class="qs-strip">
     <div class="qs-item">
       <span class="qs-label">Next Month Forecast</span>
       <span class="qs-value" id="fc-next-month">—</span>
@@ -70,13 +78,13 @@
     </div>
   </div>
 
-  <!-- Main forecast chart -->
-  <section class="sa-grid sa-grid-full">
+  <!-- Revenue Forecast — full width -->
+  <section class="sa-grid sa-grid-full" style="margin-bottom:20px;">
     <div class="panel">
       <div class="panel-header">
         <div>
           <div class="panel-title">Revenue Forecast — Next 6 Months</div>
-          <div class="panel-sub">Actual historical revenue vs predicted future revenue</div>
+          <div class="panel-sub">Historical revenue vs predicted future revenue</div>
         </div>
         <span class="panel-badge badge-indigo">Forecast</span>
       </div>
@@ -84,32 +92,47 @@
     </div>
   </section>
 
-  <!-- Category vs Overall Trend + Season heatmap -->
+  <!-- New KPI strip — placed under revenue forecast -->
+  <div class="qs-strip" style="margin-bottom:20px;">
+    <div class="qs-item">
+      <span class="qs-label">Top Predicted Product</span>
+      <span class="qs-value" id="fc-top-product">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">Low Predicted Product</span>
+      <span class="qs-value" id="fc-low-product">—</span>
+    </div>
+    <div class="qs-divider"></div>
+    <div class="qs-item">
+      <span class="qs-label">Best Predicted Location</span>
+      <span class="qs-value" id="fc-best-region">—</span>
+    </div>
+  </div>
+
+  <!-- Profit Forecast + Category Growth side by side -->
   <section class="sa-grid sa-grid-50-50">
 
     <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Category vs Overall Trend</div>
-          <div class="panel-sub">Historical & 6-month forecast per category vs overall trend</div>
+          <div class="panel-title">Profit Forecast — Next 6 Months</div>
+          <div class="panel-sub">Historical profit vs predicted future profit</div>
         </div>
-        <span class="panel-badge badge-teal">Forecast</span>
+        <span class="panel-badge badge-green">Profit</span>
       </div>
-      <!-- Checkboxes -->
-      <div id="category-filter" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;"></div>
-      <!-- Chart -->
-      <canvas id="forecastCategoryChart" height="120"></canvas>
+      <canvas id="profitForecastChart" height="140"></canvas>
     </div>
 
     <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Peak & Off-Season Detection</div>
-          <div class="panel-sub">Average revenue vs overall mean by month</div>
+          <div class="panel-title">Category Growth Prediction</div>
+          <div class="panel-sub">Predicted 6-month revenue per category</div>
         </div>
-        <span class="panel-badge badge-amber">Seasonality</span>
+        <span class="panel-badge badge-teal">6-Month Forecast</span>
       </div>
-      <div class="season-grid" id="season-grid"></div>
+      <canvas id="categoryGrowthChart" height="140"></canvas>
     </div>
 
   </section>
@@ -118,41 +141,21 @@
 
 <script>
 
-const CAT_COLORS = [
-  "#6366f1","#f59e0b","#10b981","#ef4444",
-  "#3b82f6","#ec4899","#8b5cf6","#14b8a6"
-];
-
-let forecastCategoryChart = null;
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function buildDataset(label, values, color, dashed) {
-  return {
-    label: label,
-    data: values,
-    borderColor: color,
-    backgroundColor: "transparent",
-    borderWidth: dashed ? 1.8 : 2.5,
-    borderDash: dashed ? [6, 4] : [],
-    pointRadius: 2,
-    tension: 0.3,
-    spanGaps: true
-  };
+function fmt(v) {
+  if (v >= 1e7) return "₹" + (v / 1e7).toFixed(1) + "Cr";
+  if (v >= 1e5) return "₹" + (v / 1e5).toFixed(1) + "L";
+  return "₹" + Math.round(v).toLocaleString();
 }
 
-// Splits a full series into solid (historical) + dashed (forecast) datasets.
-// Overlaps by 1 point at the boundary so the lines connect visually.
-function splitSeries(label, allValues, color, histLen) {
-  const hist = allValues.map((v, i) => i < histLen ? v : null);
-  const fore = allValues.map((v, i) => i >= histLen - 1 ? v : null);
-  return [
-    buildDataset(label, hist, color, false),
-    buildDataset("",    fore, color, true)   // empty label → hidden from legend
-  ];
-}
+const PALETTE = ["#0ea5a4","#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#ec4899","#8b5cf6"];
 
-// ── Main loader ────────────────────────────────────────────────────────────
+const tooltipStyle = {
+  backgroundColor: "rgba(17,24,39,0.88)",
+  titleColor: "#f9fafb",
+  bodyColor: "#d1d5db",
+  padding: 10,
+  cornerRadius: 8
+};
 
 function loadForecast() {
   fetch("/forecast")
@@ -160,48 +163,41 @@ function loadForecast() {
     .then(data => {
       if (data.error) { console.warn(data.error); return; }
 
-      const histLen   = data.historical_len;
-      const allLabels = data.all_labels;
-      const overall   = data.overall;
+      const {
+        all_labels, overall, historical_len,
+        season_data, fastest_growing_category,
+        all_profit, category_forecast_totals,
+        top_predicted_product, low_predicted_product, best_predicted_region
+      } = data;
 
-      // ── KPI strip ────────────────────────────────────────────────────
-      const fcVals = overall.slice(histLen);
+      // ── Original KPI strip ────────────────────────────────────────────────
+      const fcRevVals = overall.slice(historical_len);
+      document.getElementById("fc-next-month").innerText = fmt(fcRevVals[0]);
+      document.getElementById("fc-6m-total").innerText   = fmt(fcRevVals.reduce((a, b) => a + b, 0));
 
-      document.getElementById("fc-next-month").innerText =
-        "₹" + Math.round(fcVals[0]).toLocaleString();
-
-      const total6m = fcVals.reduce((a, b) => a + b, 0);
-      document.getElementById("fc-6m-total").innerText =
-        "₹" + Math.round(total6m).toLocaleString();
-
-      const peak    = data.season_data.reduce((a, b) => a.Avg_Revenue > b.Avg_Revenue ? a : b);
-      const offSeas = data.season_data.reduce((a, b) => a.Avg_Revenue < b.Avg_Revenue ? a : b);
+      const peak    = season_data.reduce((a, b) => a.Avg_Revenue > b.Avg_Revenue ? a : b);
+      const offSeas = season_data.reduce((a, b) => a.Avg_Revenue < b.Avg_Revenue ? a : b);
       document.getElementById("fc-peak-month").innerText = peak.Month_Name;
       document.getElementById("fc-off-month").innerText  = offSeas.Month_Name;
+      document.getElementById("fc-top-cat").innerText    = fastest_growing_category;
 
-      // Fastest growing category — biggest rise across 6-month forecast
-      const cats = Object.keys(data.category_series);
-      let topCat = "", topGrowth = -Infinity;
-      cats.forEach(cat => {
-        const fore = data.category_series[cat].forecast;
-        if (fore.length < 2) return;
-        const growth = fore[fore.length - 1] - fore[0];
-        if (growth > topGrowth) { topGrowth = growth; topCat = cat; }
-      });
-      document.getElementById("fc-top-cat").innerText = topCat || "—";
+      // ── New KPI strip ─────────────────────────────────────────────────────
+      document.getElementById("fc-top-product").innerText  = top_predicted_product;
+      document.getElementById("fc-low-product").innerText  = low_predicted_product;
+      document.getElementById("fc-best-region").innerText  = best_predicted_region;
 
-      // ── Overall forecast chart ────────────────────────────────────────
-      const histPadded = overall.map((v, i) => i < histLen ? v : null);
-      const forePadded = overall.map((v, i) => i >= histLen - 1 ? v : null);
+      // ── Revenue forecast chart ────────────────────────────────────────────
+      const revHist = overall.map((v, i) => i < historical_len ? v : null);
+      const revFore = overall.map((v, i) => i >= historical_len - 1 ? v : null);
 
       new Chart(document.getElementById("forecastChart").getContext("2d"), {
         type: "line",
         data: {
-          labels: allLabels,
+          labels: all_labels,
           datasets: [
             {
               label: "Actual Revenue",
-              data: histPadded,
+              data: revHist,
               borderColor: "#0ea5a4",
               backgroundColor: "rgba(14,165,164,0.08)",
               borderWidth: 2.5,
@@ -212,9 +208,9 @@ function loadForecast() {
             },
             {
               label: "Forecast",
-              data: forePadded,
+              data: revFore,
               borderColor: "#6366f1",
-              backgroundColor: "rgba(99,102,241,0.08)",
+              backgroundColor: "rgba(99,102,241,0.06)",
               borderWidth: 2.5,
               borderDash: [6, 4],
               pointRadius: 4,
@@ -228,172 +224,93 @@ function loadForecast() {
           responsive: true,
           plugins: {
             legend: { position: "top", labels: { color: "#374151", font: { size: 12 }, boxWidth: 10 } },
-            tooltip: {
-              backgroundColor: "rgba(17,24,39,0.88)",
-              titleColor: "#f9fafb",
-              bodyColor: "#d1d5db",
-              padding: 10,
-              cornerRadius: 8
-            }
+            tooltip: { ...tooltipStyle, callbacks: { label: ctx => " " + ctx.dataset.label + ": " + fmt(ctx.raw) } }
           },
           scales: {
             x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 12 } } },
-            y: {
-              grid: { color: "rgba(0,0,0,0.05)" },
-              ticks: { color: "#9ca3af", font: { size: 12 }, callback: v => "₹" + v.toLocaleString() }
-            }
+            y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { color: "#9ca3af", font: { size: 12 }, callback: v => fmt(v) } }
           }
         }
       });
 
-      // ── Category vs Overall chart ─────────────────────────────────────
-      renderCategoryForecast(data);
+      // ── Profit forecast chart ─────────────────────────────────────────────
+      const profHist = all_profit.map((v, i) => i < historical_len ? v : null);
+      const profFore = all_profit.map((v, i) => i >= historical_len - 1 ? v : null);
 
-      // ── Seasonality grid ──────────────────────────────────────────────
-      const grid = document.getElementById("season-grid");
-      grid.innerHTML = "";
-      data.season_data.forEach(s => {
-        const up        = s.Pct_vs_Avg >= 0;
-        const abs       = Math.abs(s.Pct_vs_Avg);
-        const intensity = Math.min(abs / 50, 1);
-        const bg        = up
-          ? `rgba(14,165,164,${0.1 + intensity * 0.35})`
-          : `rgba(239,68,68,${0.1 + intensity * 0.35})`;
-        grid.innerHTML +=
-          "<div class='season-cell' style='background:" + bg + "'>" +
-            "<div class='season-month'>" + s.Month_Name + "</div>" +
-            "<div class='season-pct " + (up ? "trend-up" : "trend-down") + "'>" +
-              (up ? "▲" : "▼") + " " + abs + "%" +
-            "</div>" +
-          "</div>";
+      new Chart(document.getElementById("profitForecastChart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: all_labels,
+          datasets: [
+            {
+              label: "Actual Profit",
+              data: profHist,
+              borderColor: "#10b981",
+              backgroundColor: "rgba(16,185,129,0.08)",
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: "#10b981",
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: "Forecast",
+              data: profFore,
+              borderColor: "#f59e0b",
+              backgroundColor: "rgba(245,158,11,0.06)",
+              borderWidth: 2.5,
+              borderDash: [6, 4],
+              pointRadius: 4,
+              pointBackgroundColor: "#f59e0b",
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "top", labels: { color: "#374151", font: { size: 12 }, boxWidth: 10 } },
+            tooltip: { ...tooltipStyle, callbacks: { label: ctx => " " + ctx.dataset.label + ": " + fmt(ctx.raw) } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 11 }, maxRotation: 45 } },
+            y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { color: "#9ca3af", font: { size: 12 }, callback: v => fmt(v) } }
+          }
+        }
+      });
+
+      // ── Category growth prediction bar chart ──────────────────────────────
+      const catLabels = Object.keys(category_forecast_totals);
+      const catValues = Object.values(category_forecast_totals);
+
+      new Chart(document.getElementById("categoryGrowthChart").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: catLabels,
+          datasets: [{
+            label: "Predicted 6-Month Revenue",
+            data: catValues,
+            backgroundColor: catLabels.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: 6,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: { ...tooltipStyle, callbacks: { label: ctx => " " + ctx.label + ": " + fmt(ctx.raw) } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: "#9ca3af", font: { size: 12 } } },
+            y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { color: "#9ca3af", font: { size: 12 }, callback: v => fmt(v) } }
+          }
+        }
       });
 
     })
     .catch(err => console.error("Forecast error:", err));
-}
-
-// ── Category chart ─────────────────────────────────────────────────────────
-
-function renderCategoryForecast(data) {
-  const { all_labels, overall, historical_len, category_series } = data;
-  const categories = Object.keys(category_series);
-
-  // Build checkboxes
-  const filterDiv = document.getElementById("category-filter");
-  filterDiv.innerHTML = "";
-
-  // Overall checkbox
-  filterDiv.innerHTML += `
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151;">
-      <input type="checkbox" id="chk-overall" checked onchange="updateCategoryChart()" />
-      <span style="display:inline-block;width:24px;height:3px;background:#94a3b8;border-radius:2px;"></span>
-      Overall
-    </label>`;
-
-  // Per-category checkboxes
-  categories.forEach((cat, i) => {
-    const color = CAT_COLORS[i % CAT_COLORS.length];
-    filterDiv.innerHTML += `
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#374151;">
-        <input type="checkbox" id="chk-${CSS.escape(cat)}" checked onchange="updateCategoryChart()" />
-        <span style="display:inline-block;width:24px;height:3px;background:${color};border-radius:2px;"></span>
-        ${cat}
-      </label>`;
-  });
-
-  // Build and store datasets keyed by category
-  window._categoryDatasets = [];
-
-  // Overall
-  window._categoryDatasets.push({
-    key: "overall",
-    datasets: splitSeries("Overall", overall, "#94a3b8", historical_len)
-  });
-
-  // Per category
-  categories.forEach((cat, i) => {
-    const color     = CAT_COLORS[i % CAT_COLORS.length];
-    const allValues = category_series[cat].all_values;
-    window._categoryDatasets.push({
-      key: cat,
-      datasets: splitSeries(cat, allValues, color, historical_len)
-    });
-  });
-
-  // Initial draw
-  drawCategoryChart(all_labels);
-}
-
-function updateCategoryChart() {
-  const visible  = window._categoryDatasets.filter(entry => {
-    const chk = document.getElementById("chk-" + CSS.escape(entry.key));
-    return chk && chk.checked;
-  });
-  const datasets = visible.flatMap(e => e.datasets);
-
-  if (forecastCategoryChart) {
-    forecastCategoryChart.data.datasets = datasets;
-    forecastCategoryChart.update();
-  }
-}
-
-function drawCategoryChart(labels) {
-  const ctx = document.getElementById("forecastCategoryChart").getContext("2d");
-
-  if (forecastCategoryChart) {
-    forecastCategoryChart.destroy();
-  }
-
-  const datasets = window._categoryDatasets.flatMap(e => e.datasets);
-
-  forecastCategoryChart = new Chart(ctx, {
-    type: "line",
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: {
-          position: "top",
-          labels: {
-            color: "#374151",
-            font: { size: 12 },
-            boxWidth: 10,
-            // hide the duplicate dashed-line legend entries (label === "")
-            filter: item => item.text !== ""
-          }
-        },
-        tooltip: {
-          backgroundColor: "rgba(17,24,39,0.88)",
-          titleColor: "#f9fafb",
-          bodyColor: "#d1d5db",
-          padding: 10,
-          cornerRadius: 8,
-          callbacks: {
-            label: ctx => {
-              if (ctx.raw === null || ctx.raw === undefined) return null;
-              if (ctx.dataset.label === "") return null;
-              return ctx.dataset.label + ": ₹" + Math.round(ctx.raw).toLocaleString();
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: "#9ca3af", font: { size: 11 }, maxRotation: 45 }
-        },
-        y: {
-          grid: { color: "rgba(0,0,0,0.05)" },
-          ticks: {
-            color: "#9ca3af",
-            font: { size: 12 },
-            callback: v => "₹" + v.toLocaleString()
-          }
-        }
-      }
-    }
-  });
 }
 
 document.addEventListener("DOMContentLoaded", loadForecast);

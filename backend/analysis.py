@@ -268,27 +268,106 @@ def get_forecast(df):
             "all_values": hist_values + cat_future
         }
 
-    # Season data 
+    # --- Profit forecast ---
+    df["Profit"] = (df["Selling_Price"] - df["Cost_Price"]) * df["Quantity"]
+    monthly_profit = (
+        df.groupby("Month")
+        .agg({"Profit": "sum"})
+        .reset_index()
+        .sort_values("Month")
+    )
+    monthly_profit["Month_Index"] = range(len(monthly_profit))
+    Xp = monthly_profit[["Month_Index"]].values
+    yp = monthly_profit["Profit"].values
+    profit_model   = LinearRegression().fit(Xp, yp)
+    profit_future  = [max(0, float(profit_model.predict([[len(monthly_profit) + i]])[0])) for i in range(6)]
+    all_profit     = [float(v) for v in yp] + profit_future
+
+    # --- Category growth prediction (6-month forecast totals) ---
+    category_forecast_totals = {
+        cat: round(sum(v["forecast"]), 2)
+        for cat, v in category_series.items()
+    }
+
+    # --- Per-product prediction (top & low predicted revenue next month) ---
+    product_preds = {}
+    for prod, grp in df.groupby("Product_Name"):
+        prod_monthly = (
+            grp.groupby("Month")
+            .agg({"Revenue": "sum"})
+            .reset_index()
+            .sort_values("Month")
+        )
+        if len(prod_monthly) < 2:
+            continue
+        prod_monthly["Month_Index"] = range(len(prod_monthly))
+        Xpr = prod_monthly[["Month_Index"]].values
+        ypr = prod_monthly["Revenue"].values
+        pm  = LinearRegression().fit(Xpr, ypr)
+        next_pred = max(0, float(pm.predict([[len(prod_monthly)]])[0]))
+        product_preds[prod] = next_pred
+
+    top_product = max(product_preds, key=product_preds.get) if product_preds else "—"
+    low_product = min(product_preds, key=product_preds.get) if product_preds else "—"
+
+    # --- Per-region prediction (best predicted region next month) ---
+    region_preds = {}
+    for region, grp in df.groupby("Region"):
+        reg_monthly = (
+            grp.groupby("Month")
+            .agg({"Revenue": "sum"})
+            .reset_index()
+            .sort_values("Month")
+        )
+        if len(reg_monthly) < 2:
+            continue
+        reg_monthly["Month_Index"] = range(len(reg_monthly))
+        Xr = reg_monthly[["Month_Index"]].values
+        yr = reg_monthly["Revenue"].values
+        rm = LinearRegression().fit(Xr, yr)
+        next_pred = max(0, float(rm.predict([[len(reg_monthly)]])[0]))
+        region_preds[region] = next_pred
+
+    best_region = max(region_preds, key=region_preds.get) if region_preds else "—"
+
+    # --- Season data (for original KPI strip) ---
     monthly["Month_Num"] = monthly["Month"].apply(lambda p: p.month)
-    avg_by_month  = monthly.groupby("Month_Num")["Revenue"].mean()
-    overall_avg   = avg_by_month.mean()
-    month_names   = ["Jan","Feb","Mar","Apr","May","Jun",
-                     "Jul","Aug","Sep","Oct","Nov","Dec"]
-    season_data   = []
+    avg_by_month = monthly.groupby("Month_Num")["Revenue"].mean()
+    overall_avg  = avg_by_month.mean()
+    month_names  = ["Jan","Feb","Mar","Apr","May","Jun",
+                    "Jul","Aug","Sep","Oct","Nov","Dec"]
+    season_data  = []
     for m, rev in avg_by_month.items():
         pct_vs_avg = ((rev - overall_avg) / overall_avg * 100) if overall_avg != 0 else 0
         season_data.append({
-            "Month_Name": month_names[m - 1],
+            "Month_Name":  month_names[m - 1],
             "Avg_Revenue": round(float(rev), 2),
             "Pct_vs_Avg":  round(pct_vs_avg, 1)
         })
 
+    # Fastest growing category
+    fastest_cat = ""
+    top_growth  = float("-inf")
+    for cat, v in category_series.items():
+        fore = v["forecast"]
+        if len(fore) >= 2:
+            growth = fore[-1] - fore[0]
+            if growth > top_growth:
+                top_growth  = growth
+                fastest_cat = cat
+
     return {
-        "all_labels":       all_labels,          
-        "overall":          all_overall,          
-        "historical_len":   historical_len,       
-        "category_series":  category_series,      
-        "season_data":      season_data
+        "all_labels":                all_labels,
+        "overall":                   all_overall,
+        "historical_len":            historical_len,
+        "category_series":           category_series,
+        "season_data":               season_data,
+        "fastest_growing_category":  fastest_cat or "—",
+        "all_profit":                all_profit,
+        "category_forecast_totals":  category_forecast_totals,
+        "top_predicted_product":     top_product,
+        "low_predicted_product":     low_product,
+        "best_predicted_region":     best_region,
     }
 
 if __name__ == "__main__":

@@ -23,13 +23,21 @@
     </div>
 
     <nav class="sv-links">
-      <a href="{{ url_for('home') }}">Dashboard</a>
+      <a href="{{ url_for('home') }}"  class="active">Dashboard</a>
       <a href="{{ url_for('upload_page') }}">Data Upload</a>
       <a href="{{ url_for('sales') }}">Sales Analysis</a>
       <a href="{{ url_for('predictive') }}">Predictive</a>
       <a href="{{ url_for('decision') }}">Decision Support</a>
       <a href="{{ url_for('whatif') }}">What-If</a>
       <a href="{{ url_for('about') }}">About</a>
+      <a href="{{ url_for('logout') }}"
+         style="font-size:13px; font-weight:600; color:#374151; text-decoration:none;
+                border:1.5px solid #e5e7eb; border-radius:8px; padding:6px 14px;
+                transition:border-color 0.2s, color 0.2s;"
+         onmouseover="this.style.borderColor='#0ea5a4';this.style.color='#0ea5a4';"
+         onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151';">
+        Sign Out
+      </a>
     </nav>
   </div>
 </header>

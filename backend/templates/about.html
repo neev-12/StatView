@@ -568,13 +568,14 @@
       </div>
     </div>
     <nav class="sv-links">
-      <a href="{{ url_for('home') }}">Dashboard</a>
-      <a href="{{ url_for('upload_page') }}">Data Upload</a>
-      <a href="{{ url_for('sales') }}">Sales Analysis</a>
-      <a href="{{ url_for('predictive') }}">Predictive</a>
-      <a href="{{ url_for('decision') }}">Decision Support</a>
-      <a href="{{ url_for('whatif') }}">What-If</a>
-      <a href="{{ url_for('about') }}" class="active">About</a>
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}"
+         style="border:1.5px solid #e5e7eb; border-radius:8px; padding:6px 14px;
+                transition:border-color 0.2s, color 0.2s;"
+         onmouseover="this.style.borderColor='#0ea5a4';this.style.color='#0ea5a4';"
+         onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151';">
+        Register
+      </a>
     </nav>
   </div>
 </header>
@@ -904,8 +905,8 @@
     <h2 class="ab-cta-title">Ready to explore your <em>data</em>?</h2>
     <p class="ab-cta-sub">Upload your sales file and see every module in action.</p>
     <div class="ab-cta-btns">
-      <a href="{{ url_for('upload_page') }}" class="ab-btn-primary">Upload Dataset →</a>
-      <a href="{{ url_for('home') }}" class="ab-btn-secondary">View Dashboard</a>
+      <a href="{{ url_for('login') }}" class="ab-btn-primary">Login →</a>
+      <a href="{{ url_for('register') }}" class="ab-btn-secondary">Create Account</a>
     </div>
   </div>
 </div>
