@@ -210,7 +210,6 @@ def get_forecast(df):
     monthly["Month_Index"] = range(len(monthly))
     monthly["Month_Str"]   = monthly["Month"].astype(str)
 
-    # --- Overall model ---
     X = monthly[["Month_Index"]].values
     y = monthly["Revenue"].values
     model = LinearRegression().fit(X, y)
@@ -226,7 +225,7 @@ def get_forecast(df):
     all_overall   = [float(v) for v in y] + future_preds
     historical_len = len(monthly)
 
-    # --- Per-category model ---
+
     category_series = {}
     for cat, grp in df.groupby("Category"):
         cat_monthly = (
@@ -268,7 +267,7 @@ def get_forecast(df):
             "all_values": hist_values + cat_future
         }
 
-    # --- Profit forecast ---
+
     df["Profit"] = (df["Selling_Price"] - df["Cost_Price"]) * df["Quantity"]
     monthly_profit = (
         df.groupby("Month")
@@ -283,13 +282,13 @@ def get_forecast(df):
     profit_future  = [max(0, float(profit_model.predict([[len(monthly_profit) + i]])[0])) for i in range(6)]
     all_profit     = [float(v) for v in yp] + profit_future
 
-    # --- Category growth prediction (6-month forecast totals) ---
+
     category_forecast_totals = {
         cat: round(sum(v["forecast"]), 2)
         for cat, v in category_series.items()
     }
 
-    # --- Per-product prediction (top & low predicted revenue next month) ---
+
     product_preds = {}
     for prod, grp in df.groupby("Product_Name"):
         prod_monthly = (

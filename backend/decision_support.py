@@ -20,7 +20,7 @@ def get_decision_support(df, goal_metric, goal_value, goal_type,
     df["Profit"]      = (df["Selling_Price"] - df["Cost_Price"]) * df["Quantity"]
     df["Margin_Pct"]  = ((df["Selling_Price"] - df["Cost_Price"]) / df["Selling_Price"]) * 100
 
-    # ── Baseline metrics ────────────────────────────────────────────────────
+    # Baseline metrics 
     baseline_revenue = float(df["Revenue"].sum())
     baseline_profit  = float(df["Profit"].sum())
     baseline_volume  = int(df["Quantity"].sum())
@@ -32,7 +32,7 @@ def get_decision_support(df, goal_metric, goal_value, goal_type,
         "margin":  round(baseline_profit / baseline_revenue * 100, 1) if baseline_revenue else 0
     }
 
-    # ── Resolve absolute target ──────────────────────────────────────────────
+    # Resolve absolute target 
     base_val = {"revenue": baseline_revenue, "profit": baseline_profit, "volume": baseline_volume}[goal_metric]
     if goal_type == "percent":
         target = base_val * (1 + goal_value / 100)

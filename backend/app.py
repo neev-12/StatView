@@ -19,8 +19,6 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 
-# ── Database ──────────────────────────────────────────────────────────────────
-
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -41,7 +39,6 @@ def init_db():
 init_db()
 
 
-# ── Auth helpers ──────────────────────────────────────────────────────────────
 
 def login_required(f):
     @functools.wraps(f)
@@ -77,8 +74,6 @@ def load_df():
         return pd.read_excel(filepath), None, None
     return None, jsonify({"error": "Unsupported file format"}), 400
 
-
-# ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -135,9 +130,7 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for("about"))
-
-
-# ── Page routes ───────────────────────────────────────────────────────────────
+    
 
 @app.route("/")
 def about():
